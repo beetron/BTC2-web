@@ -166,7 +166,25 @@ class AuthService {
    */
   private handleError(error: unknown): Error {
     if (axios.isAxiosError(error)) {
-      return new Error(error.response?.data?.message || error.message);
+      // Handle HTTP errors with status codes
+      if (error.response?.status === 400) {
+        return new Error("Invalid login");
+      }
+      if (error.response?.status === 401) {
+        return new Error("Invalid login");
+      }
+      if (error.response?.status === 404) {
+        return new Error("User not found");
+      }
+      if (error.response?.status === 500) {
+        return new Error("Server error");
+      }
+      // Handle network/connection errors
+      if (!error.response) {
+        return new Error("Connection failed");
+      }
+      // Use server message if available
+      return new Error(error.response.data?.message || error.message);
     }
     return new Error("An unknown error occurred");
   }

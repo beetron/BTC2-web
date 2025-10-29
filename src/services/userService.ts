@@ -6,13 +6,13 @@
 import axios, { AxiosInstance } from "axios";
 import { API_BASE_URL } from "../config";
 
-interface User {
-  _id: string;
-  email: string;
-  nickname: string;
-  uniqueId: string;
-  profileImage?: string;
-}
+// interface User {
+//   _id: string;
+//   email: string;
+//   nickname: string;
+//   uniqueId: string;
+//   profileImage?: string;
+// }
 
 interface FriendRequest {
   _id: string;

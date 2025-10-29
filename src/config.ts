@@ -16,8 +16,7 @@ declare global {
 }
 
 const API_URL_DEV = import.meta.env.VITE_API_URL_DEV || "http://localhost:3000";
-const API_URL_PROD =
-  import.meta.env.VITE_API_URL_PROD || "https://api.btc2.com";
+const API_URL_PROD = import.meta.env.VITE_API_URL_PROD;
 
 // Determine environment
 const isDevelopment =
