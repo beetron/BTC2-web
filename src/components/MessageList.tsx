@@ -11,9 +11,10 @@ interface Message {
   _id: string;
   senderId: string;
   receiverId: string;
-  text: string;
+  message: string;
   image?: string;
   createdAt: string;
+  updatedAt?: string;
   readAt?: string;
 }
 
@@ -89,7 +90,7 @@ export const MessageList: React.FC<MessageListProps> = ({ friendId }) => {
                 size="sm"
                 c={msg.senderId === currentUserId ? "white" : "black"}
               >
-                {msg.text}
+                {msg.message}
               </Text>
               <Text
                 size="xs"

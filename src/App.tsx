@@ -8,8 +8,7 @@ import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AppRouter } from "./router/AppRouter";
-import { ThemeToggle } from "./components/ThemeToggle";
-import { Box, Group } from "@mantine/core";
+import { Box } from "@mantine/core";
 
 function App() {
   return (
@@ -22,9 +21,6 @@ function App() {
       <AuthProvider>
         <Box>
           <AppRouter />
-          <Group style={{ position: "fixed", right: 20, top: 20 }}>
-            <ThemeToggle />
-          </Group>
         </Box>
       </AuthProvider>
     </MantineProvider>

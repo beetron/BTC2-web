@@ -16,11 +16,9 @@ import { API_BASE_URL } from "../config";
 
 interface FriendRequest {
   _id: string;
-  senderId: string;
-  senderNickname: string;
-  senderUniqueId: string;
-  status: "pending" | "accepted" | "rejected";
-  createdAt: string;
+  nickname: string;
+  uniqueId: string;
+  profileImage?: string;
 }
 
 interface Friend {

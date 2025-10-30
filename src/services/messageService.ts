@@ -10,9 +10,10 @@ interface Message {
   _id: string;
   senderId: string;
   receiverId: string;
-  text: string;
+  message: string;
   image?: string;
   createdAt: string;
+  updatedAt?: string;
   readAt?: string;
 }
 

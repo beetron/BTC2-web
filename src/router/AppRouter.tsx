@@ -15,6 +15,7 @@ import { SignupPage } from "../pages/SignupPage";
 import { ForgotUsernamePage } from "../pages/ForgotUsernamePage";
 import { ForgotPasswordPage } from "../pages/ForgotPasswordPage";
 import { ProfilePage } from "../pages/ProfilePage";
+import { EditFriendsPage } from "../pages/EditFriendsPage";
 
 export const AppRouter: React.FC = () => {
   return (
@@ -40,6 +41,14 @@ export const AppRouter: React.FC = () => {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/edit-friends"
+          element={
+            <ProtectedRoute>
+              <EditFriendsPage />
             </ProtectedRoute>
           }
         />
