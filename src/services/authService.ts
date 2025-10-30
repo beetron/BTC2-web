@@ -32,6 +32,7 @@ interface ForgotUsernameRequest {
 }
 
 interface ForgotPasswordRequest {
+  username: string;
   email: string;
 }
 
@@ -105,9 +106,7 @@ class AuthService {
     data: ForgotUsernameRequest
   ): Promise<{ message: string }> {
     try {
-      const response = await this.api.get("/auth/forgotusername", {
-        params: data,
-      });
+      const response = await this.api.post("/auth/forgotusername", data);
       return response.data;
     } catch (error) {
       throw this.handleError(error);
@@ -121,9 +120,7 @@ class AuthService {
     data: ForgotPasswordRequest
   ): Promise<{ message: string }> {
     try {
-      const response = await this.api.get("/auth/forgotpassword", {
-        params: data,
-      });
+      const response = await this.api.post("/auth/forgotpassword", data);
       return response.data;
     } catch (error) {
       throw this.handleError(error);
@@ -174,7 +171,7 @@ class AuthService {
         return new Error("Invalid login");
       }
       if (error.response?.status === 404) {
-        return new Error("User not found");
+        return new Error("Invalid data");
       }
       if (error.response?.status === 500) {
         return new Error("Server error");

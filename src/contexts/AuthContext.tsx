@@ -18,7 +18,7 @@ interface AuthContextType {
   ) => Promise<void>;
   logout: () => Promise<void>;
   forgotUsername: (email: string) => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
+  forgotPassword: (username: string, email: string) => Promise<void>;
   error: string | null;
   clearError: () => void;
 }
@@ -100,10 +100,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const forgotPassword = async (email: string) => {
+  const forgotPassword = async (username: string, email: string) => {
     setError(null);
     try {
-      await authService.forgotPassword({ email });
+      await authService.forgotPassword({ username, email });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Request failed";
       setError(message);

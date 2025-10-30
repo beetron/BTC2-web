@@ -22,7 +22,7 @@ function App() {
       <AuthProvider>
         <Box>
           <AppRouter />
-          <Group style={{ position: "fixed", right: 20, bottom: 20 }}>
+          <Group style={{ position: "fixed", right: 20, top: 20 }}>
             <ThemeToggle />
           </Group>
         </Box>

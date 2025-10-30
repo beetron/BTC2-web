@@ -32,7 +32,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
     setIsLoading(true);
     try {
-      await messageService.sendMessage(friendId, { text: message });
+      await messageService.sendMessage(friendId, { message });
       setMessage("");
       onMessageSent?.();
       notifications.show({

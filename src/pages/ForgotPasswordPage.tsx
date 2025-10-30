@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 export const ForgotPasswordPage: React.FC = () => {
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -28,10 +29,10 @@ export const ForgotPasswordPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email) {
+    if (!email || !username) {
       notifications.show({
         title: "Validation Error",
-        message: "Please enter your email",
+        message: "Missing username or email",
         color: "red",
       });
       return;
@@ -39,7 +40,7 @@ export const ForgotPasswordPage: React.FC = () => {
 
     setIsLoading(true);
     try {
-      await forgotPassword(email);
+      await forgotPassword(username, email);
       setIsSubmitted(true);
       notifications.show({
         title: "Success",
@@ -89,12 +90,21 @@ export const ForgotPasswordPage: React.FC = () => {
       </Title>
 
       <Text c="dimmed" size="sm" ta="center" mb={20}>
-        Enter your email address and we'll send you instructions to reset your
-        password
+        Matching username and email required for password reset.
       </Text>
 
       <form onSubmit={handleSubmit}>
         <Stack gap="lg">
+          <TextInput
+            label="Username"
+            placeholder="username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.currentTarget.value)}
+            leftSection={<IconMail size={16} />}
+            disabled={isLoading}
+            required
+          />
           <TextInput
             label="Email"
             placeholder="your@email.com"

@@ -17,8 +17,8 @@ interface Message {
 }
 
 interface SendMessageRequest {
-  text?: string;
-  image?: string;
+  message: string;
+  senderId?: string;
 }
 
 class MessageService {
@@ -49,12 +49,14 @@ class MessageService {
   async sendMessage(
     userId: string,
     data: SendMessageRequest
-  ): Promise<Message> {
+  ): Promise<{ success: boolean }> {
     try {
       this.setAuthHeader();
-      const response = await this.api.post<Message>(
+      const response = await this.api.post<{ success: boolean }>(
         `/messages/send/${userId}`,
-        data
+        {
+          message: data.message,
+        }
       );
       return response.data;
     } catch (error) {
