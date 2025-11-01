@@ -56,7 +56,7 @@ export const Header: React.FC<HeaderProps> = () => {
       label: "Friends",
       icon: IconUsers,
       onClick: () => {
-        navigate("/chat");
+        navigate("/friends");
         close();
       },
     },
@@ -72,19 +72,25 @@ export const Header: React.FC<HeaderProps> = () => {
       label: "Settings",
       icon: IconSettings,
       onClick: () => {
-        navigate("/profile");
+        navigate("/settings");
         close();
       },
     },
   ];
 
   return (
-    <Paper p="md" style={{ borderBottom: "1px solid #dee2e6" }}>
-      <Container fluid>
+    <Paper p="md">
+      <Container size="sm">
         <Group justify="space-between" align="center">
           {/* Logo/Title */}
           <Box>
-            <Text fw={700} size="lg">
+            <Text
+              fw={700}
+              size="lg"
+              style={{
+                fontFamily: "Greycliff CF, var(--mantine-font-family)",
+              }}
+            >
               BTC2
             </Text>
           </Box>

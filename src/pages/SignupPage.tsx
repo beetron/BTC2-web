@@ -16,6 +16,7 @@ import { IconId, IconMail, IconUser } from "@tabler/icons-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { AuthHeader } from "../components/AuthHeader";
 
 export const SignupPage: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -69,73 +70,76 @@ export const SignupPage: React.FC = () => {
   };
 
   return (
-    <Container size={420} my={40}>
-      <Title
-        ta="center"
-        style={{
-          fontFamily: "Greycliff CF, var(--mantine-font-family)",
-          fontWeight: 900,
-        }}
-        mb={50}
-      >
-        Create Account
-      </Title>
+    <>
+      <AuthHeader />
+      <Container size={420} my={40}>
+        <Title
+          ta="center"
+          style={{
+            fontFamily: "Greycliff CF, var(--mantine-font-family)",
+            fontWeight: 900,
+          }}
+          mb={50}
+        >
+          Create Account
+        </Title>
 
-      <form onSubmit={handleSubmit}>
-        <Stack gap="lg">
-          <TextInput
-            label="Email"
-            placeholder="your@email.com"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.currentTarget.value)}
-            leftSection={<IconMail size={16} />}
-            disabled={isLoading}
-            required
-          />
+        <form onSubmit={handleSubmit}>
+          <Stack gap="lg">
+            <TextInput
+              label="Email"
+              placeholder="your@email.com"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.currentTarget.value)}
+              leftSection={<IconMail size={16} />}
+              disabled={isLoading}
+              required
+            />
 
-          <TextInput
-            label="Nickname"
-            placeholder="Your nickname"
-            value={nickname}
-            onChange={(e) => setNickname(e.currentTarget.value)}
-            leftSection={<IconUser size={16} />}
-            disabled={isLoading}
-            required
-          />
+            <TextInput
+              label="Nickname"
+              placeholder="Your nickname"
+              value={nickname}
+              onChange={(e) => setNickname(e.currentTarget.value)}
+              leftSection={<IconUser size={16} />}
+              disabled={isLoading}
+              required
+            />
 
-          <TextInput
-            label="Unique ID"
-            placeholder="Your unique username"
-            value={uniqueId}
-            onChange={(e) => setUniqueId(e.currentTarget.value)}
-            leftSection={<IconId size={16} />}
-            disabled={isLoading}
-            required
-          />
+            <TextInput
+              label="Unique ID"
+              placeholder="Your unique username"
+              value={uniqueId}
+              onChange={(e) => setUniqueId(e.currentTarget.value)}
+              leftSection={<IconId size={16} />}
+              disabled={isLoading}
+              required
+            />
 
-          <PasswordInput
-            label="Password"
-            placeholder="Your password"
-            value={password}
-            onChange={(e) => setPassword(e.currentTarget.value)}
-            disabled={isLoading}
-            required
-          />
+            <PasswordInput
+              label="Password"
+              placeholder="Your password"
+              value={password}
+              onChange={(e) => setPassword(e.currentTarget.value)}
+              disabled={isLoading}
+              required
+            />
 
-          <Button type="submit" loading={isLoading} fullWidth>
-            Sign up
+            <Button type="submit" loading={isLoading} fullWidth>
+              Sign up
+            </Button>
+          </Stack>
+        </form>
+
+        <Text ta="center" mt="xl">
+          Already have an account?{" "}
+          <Button variant="subtle" onClick={() => navigate("/login")}>
+            Sign in
           </Button>
-        </Stack>
-      </form>
-
-      <Text ta="center" mt="xl">
-        Already have an account?{" "}
-        <Button variant="subtle" onClick={() => navigate("/login")}>
-          Sign in
-        </Button>
-      </Text>
-    </Container>
+        </Text>
+      </Container>
+    </>
   );
 };
 

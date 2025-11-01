@@ -29,6 +29,14 @@ interface Friend {
   profileImage?: string;
 }
 
+interface UserDetails {
+  _id: string;
+  email: string;
+  nickname: string;
+  uniqueId: string;
+  profileImage?: string;
+}
+
 class UserService {
   private api: AxiosInstance;
 
@@ -57,9 +65,22 @@ class UserService {
   async getProfileImage(filename: string): Promise<Blob> {
     try {
       this.setAuthHeader();
-      const response = await this.api.get(`/users/profileImage/${filename}`, {
+      const response = await this.api.get(`/users/images/${filename}`, {
         responseType: "blob",
       });
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get user details by ID
+   */
+  async getUserById(userId: string): Promise<UserDetails> {
+    try {
+      this.setAuthHeader();
+      const response = await this.api.get<UserDetails>(`/users/${userId}`);
       return response.data;
     } catch (error) {
       throw this.handleError(error);

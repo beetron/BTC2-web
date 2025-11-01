@@ -17,6 +17,7 @@ import { IconMail } from "@tabler/icons-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { AuthHeader } from "../components/AuthHeader";
 
 export const ForgotPasswordPage: React.FC = () => {
   const [username, setUsername] = useState("");
@@ -61,76 +62,82 @@ export const ForgotPasswordPage: React.FC = () => {
 
   if (isSubmitted) {
     return (
-      <Container size={420} my={40}>
-        <Box ta="center">
-          <Title mb={30}>Check Your Email</Title>
-          <Text color="dimmed" mb={30}>
-            We've sent password reset instructions to your email address. Please
-            check your inbox and spam folder.
-          </Text>
-          <Button onClick={() => navigate("/login")} fullWidth>
-            Back to Login
-          </Button>
-        </Box>
-      </Container>
+      <>
+        <AuthHeader />
+        <Container size={420} my={40}>
+          <Box ta="center">
+            <Title mb={30}>Check Your Email</Title>
+            <Text color="dimmed" mb={30}>
+              We've sent password reset instructions to your email address.
+              Please check your inbox and spam folder.
+            </Text>
+            <Button onClick={() => navigate("/login")} fullWidth>
+              Back to Login
+            </Button>
+          </Box>
+        </Container>
+      </>
     );
   }
 
   return (
-    <Container size={420} my={40}>
-      <Title
-        ta="center"
-        style={{
-          fontFamily: "Greycliff CF, var(--mantine-font-family)",
-          fontWeight: 900,
-        }}
-        mb={50}
-      >
-        Forgot Password
-      </Title>
+    <>
+      <AuthHeader />
+      <Container size={420} my={40}>
+        <Title
+          ta="center"
+          style={{
+            fontFamily: "Greycliff CF, var(--mantine-font-family)",
+            fontWeight: 900,
+          }}
+          mb={50}
+        >
+          Forgot Password
+        </Title>
 
-      <Text c="dimmed" size="sm" ta="center" mb={20}>
-        Matching username and email required for password reset.
-      </Text>
+        <Text c="dimmed" size="sm" ta="center" mb={20}>
+          Matching username and email required for password reset.
+        </Text>
 
-      <form onSubmit={handleSubmit}>
-        <Stack gap="lg">
-          <TextInput
-            label="Username"
-            placeholder="username"
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.currentTarget.value)}
-            leftSection={<IconMail size={16} />}
-            disabled={isLoading}
-            required
-          />
-          <TextInput
-            label="Email"
-            placeholder="your@email.com"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.currentTarget.value)}
-            leftSection={<IconMail size={16} />}
-            disabled={isLoading}
-            required
-          />
+        <form onSubmit={handleSubmit}>
+          <Stack gap="lg">
+            <TextInput
+              label="Username"
+              placeholder="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.currentTarget.value)}
+              leftSection={<IconMail size={16} />}
+              disabled={isLoading}
+              required
+            />
+            <TextInput
+              label="Email"
+              placeholder="your@email.com"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.currentTarget.value)}
+              leftSection={<IconMail size={16} />}
+              disabled={isLoading}
+              required
+            />
 
-          <Button type="submit" loading={isLoading} fullWidth>
-            Send Reset Instructions
+            <Button type="submit" loading={isLoading} fullWidth>
+              Send Reset Instructions
+            </Button>
+          </Stack>
+        </form>
+
+        <Group justify="center" mt="xl">
+          <Button variant="subtle" onClick={() => navigate("/login")}>
+            Back to Login
           </Button>
-        </Stack>
-      </form>
-
-      <Group justify="center" mt="xl">
-        <Button variant="subtle" onClick={() => navigate("/login")}>
-          Back to Login
-        </Button>
-        <Button variant="subtle" onClick={() => navigate("/forgot-username")}>
-          Forgot Username?
-        </Button>
-      </Group>
-    </Container>
+          <Button variant="subtle" onClick={() => navigate("/forgot-username")}>
+            Forgot Username?
+          </Button>
+        </Group>
+      </Container>
+    </>
   );
 };
 

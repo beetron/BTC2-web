@@ -9,6 +9,7 @@ import { authService } from "../services/authService";
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
+  userId: string | null;
   login: (username: string, password: string) => Promise<void>;
   signup: (
     email: string,
@@ -31,11 +32,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if user is already authenticated
     const token = authService.getToken();
+    const storedUserId = authService.getUserId();
     setIsAuthenticated(!!token);
+    setUserId(storedUserId);
     setIsLoading(false);
   }, []);
 
@@ -43,8 +47,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsLoading(true);
     setError(null);
     try {
-      await authService.login({ username, password });
+      const response = (await authService.login({ username, password })) as any;
+      const userId = response.userId || response._id;
       setIsAuthenticated(true);
+      setUserId(userId || null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed";
       setError(message);
@@ -63,8 +69,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsLoading(true);
     setError(null);
     try {
-      await authService.signup({ email, password, nickname, uniqueId });
+      const response = (await authService.signup({
+        email,
+        password,
+        nickname,
+        uniqueId,
+      })) as any;
+      const userId = response.userId || response._id;
       setIsAuthenticated(true);
+      setUserId(userId || null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Signup failed";
       setError(message);
@@ -80,6 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       await authService.logout();
       setIsAuthenticated(false);
+      setUserId(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Logout failed";
       setError(message);
@@ -118,6 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       value={{
         isAuthenticated,
         isLoading,
+        userId,
         login,
         signup,
         logout,

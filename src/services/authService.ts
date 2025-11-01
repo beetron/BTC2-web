@@ -21,7 +21,8 @@ interface LoginRequest {
 interface AuthResponse {
   message: string;
   token: string;
-  userId: string;
+  userId?: string;
+  _id?: string;
   nickname: string;
   uniqueId: string;
   email: string;
@@ -56,7 +57,10 @@ class AuthService {
       const response = await this.api.post<AuthResponse>("/auth/signup", data);
       if (response.data.token) {
         localStorage.setItem("token", response.data.token);
-        localStorage.setItem("userId", response.data.userId);
+        const userId = response.data.userId || response.data._id;
+        if (userId) {
+          localStorage.setItem("userId", userId);
+        }
       }
       return response.data;
     } catch (error) {
@@ -72,7 +76,10 @@ class AuthService {
       const response = await this.api.post<AuthResponse>("/auth/login", data);
       if (response.data.token) {
         localStorage.setItem("token", response.data.token);
-        localStorage.setItem("userId", response.data.userId);
+        const userId = response.data.userId || response.data._id;
+        if (userId) {
+          localStorage.setItem("userId", userId);
+        }
       }
       return response.data;
     } catch (error) {

@@ -209,7 +209,7 @@ export const EditFriendsPage: React.FC = () => {
   return (
     <>
       <Header />
-      <Container size="lg" py="xl">
+      <Container size="sm" py="xl">
         <Tabs defaultValue="requests" keepMounted={false}>
           <Tabs.List>
             <Tabs.Tab value="requests" leftSection={<IconUserPlus size={16} />}>

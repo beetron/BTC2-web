@@ -9,12 +9,12 @@ import {
   Navigate,
 } from "react-router-dom";
 import { ProtectedRoute } from "../components/ProtectedRoute";
-import { ChatPage } from "../pages/ChatPage";
+import { FriendListPage } from "../pages/FriendListPage";
 import { LoginPage } from "../pages/LoginPage";
 import { SignupPage } from "../pages/SignupPage";
 import { ForgotUsernamePage } from "../pages/ForgotUsernamePage";
 import { ForgotPasswordPage } from "../pages/ForgotPasswordPage";
-import { ProfilePage } from "../pages/ProfilePage";
+import { SettingsPage } from "../pages/SettingsPage";
 import { EditFriendsPage } from "../pages/EditFriendsPage";
 
 export const AppRouter: React.FC = () => {
@@ -29,18 +29,18 @@ export const AppRouter: React.FC = () => {
 
         {/* Protected Routes */}
         <Route
-          path="/chat"
+          path="/friends"
           element={
             <ProtectedRoute>
-              <ChatPage />
+              <FriendListPage />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/profile"
+          path="/settings"
           element={
             <ProtectedRoute>
-              <ProfilePage />
+              <SettingsPage />
             </ProtectedRoute>
           }
         />
@@ -54,8 +54,8 @@ export const AppRouter: React.FC = () => {
         />
 
         {/* Redirect */}
-        <Route path="/" element={<Navigate to="/chat" replace />} />
-        <Route path="*" element={<Navigate to="/chat" replace />} />
+        <Route path="/" element={<Navigate to="/friends" replace />} />
+        <Route path="*" element={<Navigate to="/friends" replace />} />
       </Routes>
     </Router>
   );

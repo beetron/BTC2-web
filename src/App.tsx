@@ -17,6 +17,7 @@ function App() {
       theme={{
         primaryColor: "blue",
       }}
+      defaultColorScheme="dark"
     >
       <Notifications />
       <AuthProvider>

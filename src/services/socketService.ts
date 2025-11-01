@@ -24,6 +24,7 @@ class SocketService {
    */
   initialize(userId: string): Socket {
     if (this.socket?.connected) {
+      console.log("Socket already connected, returning existing socket");
       return this.socket;
     }
 
@@ -34,15 +35,24 @@ class SocketService {
         throw new Error("No authentication token available");
       }
 
+      console.log(
+        "Creating socket connection with userId:",
+        userId,
+        "token:",
+        token.substring(0, 20) + "..."
+      );
+
       this.socket = io(CONFIG.socketUrl, {
         path: "/socket.io",
+        query: {
+          userId: userId,
+        },
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
         reconnectionAttempts: 5,
         auth: {
           token: token,
-          userId: userId,
         },
         transports: ["websocket", "polling"],
       });

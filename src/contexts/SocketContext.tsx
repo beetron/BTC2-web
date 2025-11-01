@@ -27,7 +27,7 @@ interface SocketContextProps {
 const SocketContext = createContext<SocketContextProps | undefined>(undefined);
 
 export const SocketProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, userId } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -52,6 +52,7 @@ export const SocketProvider: FC<{ children: ReactNode }> = ({ children }) => {
       socketRef.current = null;
       setSocket(null);
       setIsConnected(false);
+      isInitializing.current = false;
     } catch (error) {
       console.error("Error during socket cleanup:", error);
     } finally {
@@ -59,21 +60,55 @@ export const SocketProvider: FC<{ children: ReactNode }> = ({ children }) => {
     }
   }, []);
 
-  // Initialize socket
-  const initializeSocket = useCallback(() => {
-    if (!isAuthenticated || isInitializing.current) {
+  // Reconnect socket
+  const reconnect = useCallback(() => {
+    if (!isAuthenticated) return;
+
+    if (socket?.connected) {
+      return;
+    }
+
+    if (socket) {
+      socketService.reconnect();
+    } else {
+      // Try to initialize socket
+      if (!isInitializing.current) {
+        try {
+          isInitializing.current = true;
+          const newSocket = socketService.initialize(userId || "");
+          socketService.setupEvents();
+          setSocket(newSocket);
+          setIsConnected(newSocket.connected);
+        } catch (error) {
+          console.error("Socket reconnection error:", error);
+        } finally {
+          isInitializing.current = false;
+        }
+      }
+    }
+  }, [socket, isAuthenticated, userId]);
+
+  // Handle authentication state changes
+  useEffect(() => {
+    console.log(
+      "Auth effect triggered - isAuthenticated:",
+      isAuthenticated,
+      "userId:",
+      userId
+    );
+
+    if (!isAuthenticated || !userId) {
+      cleanup();
+      return;
+    }
+
+    if (isInitializing.current) {
+      console.log("Socket init already in progress");
       return;
     }
 
     try {
       isInitializing.current = true;
-
-      // Get userId from authService
-      const userId = require("../services/authService").authService.getUserId();
-      if (!userId) {
-        console.warn("No userId available for socket initialization");
-        return;
-      }
 
       const newSocket = socketService.initialize(userId);
       socketService.setupEvents();
@@ -87,36 +122,7 @@ export const SocketProvider: FC<{ children: ReactNode }> = ({ children }) => {
     } finally {
       isInitializing.current = false;
     }
-  }, [isAuthenticated]);
-
-  // Reconnect socket
-  const reconnect = useCallback(() => {
-    if (!isAuthenticated) return;
-
-    if (socket?.connected) {
-      console.log("Socket already connected");
-      return;
-    }
-
-    if (socket) {
-      socketService.reconnect();
-    } else {
-      initializeSocket();
-    }
-  }, [socket, initializeSocket, isAuthenticated]);
-
-  // Handle authentication state changes
-  useEffect(() => {
-    if (isAuthenticated) {
-      initializeSocket();
-    } else {
-      cleanup();
-    }
-
-    return () => {
-      // Cleanup is handled separately to avoid double cleanup
-    };
-  }, [isAuthenticated, initializeSocket, cleanup]);
+  }, [isAuthenticated, userId, cleanup]);
 
   // Listen for connection state changes
   useEffect(() => {
@@ -124,7 +130,6 @@ export const SocketProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
     const unsubscribe = socketService.onConnectionChange(
       (connected: boolean) => {
-        console.log("Socket connection changed:", connected);
         setIsConnected(connected);
       }
     );
