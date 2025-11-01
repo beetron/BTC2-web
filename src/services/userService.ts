@@ -27,6 +27,8 @@ interface Friend {
   nickname: string;
   uniqueId: string;
   profileImage?: string;
+  unreadCount?: number;
+  updatedAt?: string;
 }
 
 interface UserDetails {

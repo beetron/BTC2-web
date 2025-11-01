@@ -1,7 +1,19 @@
-import { Box, Loader, Paper, Stack, Text, Avatar, Group } from "@mantine/core";
+import {
+  Box,
+  Loader,
+  Paper,
+  Stack,
+  Text,
+  Avatar,
+  Group,
+  Badge,
+} from "@mantine/core";
+import { IconMessage } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { Socket } from "socket.io-client";
 import { userService } from "../services/userService";
+import { useSocketListener } from "../hooks/useSocketListener";
 import { getProfileImageUrl } from "../utils/profileImageUtils";
 
 interface Friend {
@@ -10,6 +22,8 @@ interface Friend {
   nickname: string;
   uniqueId: string;
   profileImage?: string;
+  unreadCount?: number;
+  updatedAt?: string;
 }
 
 interface FriendWithImage extends Friend {
@@ -18,21 +32,22 @@ interface FriendWithImage extends Friend {
 
 interface FriendListProps {
   onSelectFriend: (friendId: string) => void;
+  socket: Socket | null;
 }
 
-export const FriendList: React.FC<FriendListProps> = ({ onSelectFriend }) => {
+export const FriendList: React.FC<FriendListProps> = ({
+  onSelectFriend,
+  socket,
+}) => {
   const [friends, setFriends] = useState<FriendWithImage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadFriends();
-  }, []);
-
-  const loadFriends = async () => {
+  const loadFriends = useCallback(async () => {
+    console.log("loadFriends called");
     setIsLoading(true);
     try {
       const friendsData = await userService.getFriendList();
-      console.log("Friends data:", friendsData);
+      console.log("Friends data fetched:", friendsData);
 
       // Load profile images for all friends
       const friendsWithImages = await Promise.all(
@@ -45,10 +60,16 @@ export const FriendList: React.FC<FriendListProps> = ({ onSelectFriend }) => {
         })
       );
 
+      console.log(
+        "Setting friends state with",
+        friendsWithImages.length,
+        "friends"
+      );
       setFriends(friendsWithImages);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to load friends";
+      console.error("Error loading friends:", message);
       notifications.show({
         title: "Error",
         message,
@@ -57,7 +78,17 @@ export const FriendList: React.FC<FriendListProps> = ({ onSelectFriend }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadFriends();
+  }, [loadFriends]);
+
+  // Listen for new messages via socket
+  useSocketListener(socket, {
+    eventName: "newMessageSignal",
+    onEvent: loadFriends,
+  });
 
   if (isLoading) {
     return (
@@ -85,22 +116,32 @@ export const FriendList: React.FC<FriendListProps> = ({ onSelectFriend }) => {
                 onClick={() => onSelectFriend(friend._id)}
                 withBorder
               >
-                <Group align="center" gap="sm">
-                  <Avatar
-                    src={friend.profileImageUrl}
-                    alt={`${friend.nickname}'s profile`}
-                    size="lg"
-                    radius="xl"
-                    onError={(e) => {
-                      console.error("Avatar load error for", friend.nickname);
-                      // Remove src on error to show Mantine placeholder
-                      const target = e.target as HTMLImageElement;
-                      target.src = "";
-                    }}
-                  />
-                  <Box>
-                    <Text fw={500}>{friend.nickname}</Text>
-                  </Box>
+                <Group align="center" gap="sm" justify="space-between">
+                  <Group align="center" gap="sm">
+                    <Avatar
+                      src={friend.profileImageUrl}
+                      alt={`${friend.nickname}'s profile`}
+                      size="lg"
+                      radius="xl"
+                      onError={(e) => {
+                        console.error("Avatar load error for", friend.nickname);
+                        // Remove src on error to show Mantine placeholder
+                        const target = e.target as HTMLImageElement;
+                        target.src = "";
+                      }}
+                    />
+                    <Box>
+                      <Text fw={500}>{friend.nickname}</Text>
+                    </Box>
+                  </Group>
+                  {friend.unreadCount ? (
+                    <Group gap="xs" align="center">
+                      <IconMessage size={20} />
+                      <Badge color="blue" variant="filled" size="lg">
+                        {friend.unreadCount}
+                      </Badge>
+                    </Group>
+                  ) : null}
                 </Group>
               </Paper>
             ))
