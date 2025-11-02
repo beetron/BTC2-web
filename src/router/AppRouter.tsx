@@ -10,6 +10,7 @@ import {
 } from "react-router-dom";
 import { ProtectedRoute } from "../components/ProtectedRoute";
 import { FriendListPage } from "../pages/FriendListPage";
+import { MessagesPage } from "../pages/MessagesPage.tsx";
 import { LoginPage } from "../pages/LoginPage";
 import { SignupPage } from "../pages/SignupPage";
 import { ForgotUsernamePage } from "../pages/ForgotUsernamePage";
@@ -33,6 +34,14 @@ export const AppRouter: React.FC = () => {
           element={
             <ProtectedRoute>
               <FriendListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/messages/:friendId"
+          element={
+            <ProtectedRoute>
+              <MessagesPage />
             </ProtectedRoute>
           }
         />

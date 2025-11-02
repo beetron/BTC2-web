@@ -10,9 +10,9 @@ import { useSocket } from "../contexts/SocketContext";
 export const FriendListPage: React.FC = () => {
   const { socket } = useSocket();
 
-  const handleSelectFriend = (friendId: string) => {
-    // Messages will be shown later
-    console.log("Selected friend:", friendId);
+  // Dummy callback - FriendList handles navigation directly
+  const handleSelectFriend = () => {
+    // Navigation is handled by FriendList component
   };
 
   return (

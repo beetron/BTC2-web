@@ -79,6 +79,52 @@ class MessageService {
   }
 
   /**
+   * Upload message images
+   */
+  async uploadImages(
+    recipientId: string,
+    files: File[]
+  ): Promise<{ success: boolean; imageFiles?: string[] }> {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No auth token available");
+      }
+
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append("messageImages", file);
+      });
+
+      // Use fetch directly to ensure proper FormData handling
+      // This bypasses axios's default JSON Content-Type header
+      const response = await fetch(
+        `${API_BASE_URL}/messages/upload/${recipientId}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            // Don't set Content-Type - let browser handle it with FormData
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || `Upload failed with status ${response.status}`
+        );
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Delete messages
    */
   async deleteMessages(userId: string): Promise<{ message: string }> {

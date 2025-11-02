@@ -5,11 +5,13 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { authService } from "../services/authService";
+import { clearImageCache } from "../utils/imageLoader";
 
 interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   userId: string | null;
+  userProfileImage: string | null;
   login: (username: string, password: string) => Promise<void>;
   signup: (
     email: string,
@@ -33,13 +35,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userProfileImage, setUserProfileImage] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if user is already authenticated
     const token = authService.getToken();
     const storedUserId = authService.getUserId();
+    const storedProfileImage = authService.getUserProfileImage();
     setIsAuthenticated(!!token);
     setUserId(storedUserId);
+    setUserProfileImage(storedProfileImage);
     setIsLoading(false);
   }, []);
 
@@ -51,6 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const userId = response.userId || response._id;
       setIsAuthenticated(true);
       setUserId(userId || null);
+      setUserProfileImage(response.profileImage || null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed";
       setError(message);
@@ -78,6 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const userId = response.userId || response._id;
       setIsAuthenticated(true);
       setUserId(userId || null);
+      setUserProfileImage(response.profileImage || null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Signup failed";
       setError(message);
@@ -92,8 +99,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setError(null);
     try {
       await authService.logout();
+      clearImageCache();
       setIsAuthenticated(false);
       setUserId(null);
+      setUserProfileImage(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Logout failed";
       setError(message);
@@ -133,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         isAuthenticated,
         isLoading,
         userId,
+        userProfileImage,
         login,
         signup,
         logout,

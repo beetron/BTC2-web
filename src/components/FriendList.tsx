@@ -11,6 +11,7 @@ import {
 import { IconMessage } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Socket } from "socket.io-client";
 import { userService } from "../services/userService";
 import { useSocketListener } from "../hooks/useSocketListener";
@@ -39,6 +40,7 @@ export const FriendList: React.FC<FriendListProps> = ({
   onSelectFriend,
   socket,
 }) => {
+  const navigate = useNavigate();
   const [friends, setFriends] = useState<FriendWithImage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -113,7 +115,13 @@ export const FriendList: React.FC<FriendListProps> = ({
                 p="sm"
                 radius="md"
                 style={{ cursor: "pointer" }}
-                onClick={() => onSelectFriend(friend._id)}
+                onClick={() => {
+                  // Pass friend profile image via Router state
+                  navigate(`/messages/${friend._id}`, {
+                    state: { friendProfileImage: friend.profileImage },
+                  });
+                  onSelectFriend(friend._id);
+                }}
                 withBorder
               >
                 <Group align="center" gap="sm" justify="space-between">

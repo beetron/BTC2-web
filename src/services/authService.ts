@@ -26,6 +26,7 @@ interface AuthResponse {
   nickname: string;
   uniqueId: string;
   email: string;
+  profileImage?: string;
 }
 
 interface ForgotUsernameRequest {
@@ -61,6 +62,9 @@ class AuthService {
         if (userId) {
           localStorage.setItem("userId", userId);
         }
+        if (response.data.profileImage) {
+          localStorage.setItem("userProfileImage", response.data.profileImage);
+        }
       }
       return response.data;
     } catch (error) {
@@ -79,6 +83,9 @@ class AuthService {
         const userId = response.data.userId || response.data._id;
         if (userId) {
           localStorage.setItem("userId", userId);
+        }
+        if (response.data.profileImage) {
+          localStorage.setItem("userProfileImage", response.data.profileImage);
         }
       }
       return response.data;
@@ -99,9 +106,11 @@ class AuthService {
       }
       localStorage.removeItem("token");
       localStorage.removeItem("userId");
+      localStorage.removeItem("userProfileImage");
     } catch (error) {
       localStorage.removeItem("token");
       localStorage.removeItem("userId");
+      localStorage.removeItem("userProfileImage");
       throw this.handleError(error);
     }
   }
@@ -146,6 +155,13 @@ class AuthService {
    */
   getUserId(): string | null {
     return localStorage.getItem("userId");
+  }
+
+  /**
+   * Get stored user profile image
+   */
+  getUserProfileImage(): string | null {
+    return localStorage.getItem("userProfileImage");
   }
 
   /**
