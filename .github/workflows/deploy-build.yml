@@ -79,6 +79,7 @@ jobs:
               run: |
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git config --global url."https://x-access-token:${{ secrets.DEPLOYMENT_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
                   git add ${{ env.DEPLOYMENT_FILE }}
                   git commit -m "chore: update btc-web image to ${{ needs.build-and-push.outputs.image_tag }}"
