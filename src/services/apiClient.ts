@@ -2,18 +2,21 @@
  * Shared API Client
  * Centralized axios instance used by all services
  * Implements singleton pattern to ensure only one instance exists
+ * Uses lazy initialization to allow config.json to load first
  */
 
 import axios, { AxiosInstance } from "axios";
-import { API_BASE_URL } from "../config";
+import { CONFIG } from "../config";
 
 class ApiClient {
   private static instance: ApiClient;
   private api: AxiosInstance;
 
   private constructor() {
+    // Use CONFIG.apiUrl getter which reads from runtimeConfig
+    // This ensures the config is loaded before axios is created
     this.api = axios.create({
-      baseURL: API_BASE_URL,
+      baseURL: CONFIG.apiUrl,
       headers: {
         "Content-Type": "application/json",
       },
@@ -36,6 +39,7 @@ class ApiClient {
 
   /**
    * Get singleton instance
+   * Lazy-loads on first use to ensure config is initialized
    */
   static getInstance(): ApiClient {
     if (!ApiClient.instance) {

@@ -23,7 +23,7 @@ import { useSocketListener } from "../hooks/useSocketListener";
 import { getProfileImageUrl } from "../utils/profileImageUtils";
 import { loadImageWithAuth } from "../utils/imageLoader";
 import { parseUrlsInText, getHrefFromUrl } from "../utils/urlParser";
-import { API_BASE_URL } from "../config";
+import { CONFIG } from "../config";
 
 interface Message {
   _id: string;
@@ -113,7 +113,7 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
               }
 
               try {
-                const imageUrl = `${API_BASE_URL}/messages/uploads/images/${filename}`;
+                const imageUrl = `${CONFIG.apiUrl}/messages/uploads/images/${filename}`;
                 const blobUrl = await loadImageWithAuth(imageUrl);
                 blobUrls.set(filename, blobUrl);
               } catch (error) {

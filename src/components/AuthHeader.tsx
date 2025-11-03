@@ -14,7 +14,7 @@ export const AuthHeader: React.FC = () => {
           {/* Logo/Title */}
           <Box style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <img
-              src="/src/public/btc2-logo-400x400.png"
+              src="/btc2-logo-400x400.png"
               alt="BTC2 Logo"
               style={{
                 height: 40,

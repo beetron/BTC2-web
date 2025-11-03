@@ -6,7 +6,7 @@
 import axios from "axios";
 import { apiClient } from "./apiClient";
 import { messageCacheService } from "./messageCacheService";
-import { API_BASE_URL } from "../config";
+import { CONFIG } from "../config";
 
 interface Message {
   _id: string;
@@ -132,7 +132,7 @@ class MessageService {
       // Use fetch directly to ensure proper FormData handling
       // This bypasses axios's default JSON Content-Type header
       const response = await fetch(
-        `${API_BASE_URL}/messages/upload/${recipientId}`,
+        `${CONFIG.apiUrl}/messages/upload/${recipientId}`,
         {
           method: "POST",
           headers: {
@@ -158,11 +158,12 @@ class MessageService {
   }
 
   /**
-   * Delete messages
+   * Delete messages in a conversation up to a specific message ID
+   * Uses the latest loaded message ID to prevent timing issues with unread messages
    */
-  async deleteMessages(userId: string): Promise<{ message: string }> {
+  async deleteMessages(messageId: string): Promise<{ message: string }> {
     try {
-      const response = await this.api.delete(`/messages/delete/${userId}`);
+      const response = await this.api.delete(`/messages/delete/${messageId}`);
       return response.data;
     } catch (error) {
       throw this.handleError(error);

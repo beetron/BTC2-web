@@ -1,12 +1,12 @@
 /**
  * Environment Configuration
- * Determines API URL based on NODE_ENV
+ * Uses VITE_API_URL from .env file
+ * In Kubernetes, .env is injected via ConfigMap
  */
 
 declare global {
   interface ImportMetaEnv {
-    readonly VITE_API_URL_DEV?: string;
-    readonly VITE_API_URL_PROD?: string;
+    readonly VITE_API_URL?: string;
     readonly MODE?: string;
   }
 
@@ -15,22 +15,23 @@ declare global {
   }
 }
 
-const API_URL_DEV = import.meta.env.VITE_API_URL_DEV || "http://localhost:3000";
-const API_URL_PROD = import.meta.env.VITE_API_URL_PROD;
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-// Determine environment
-const isDevelopment =
-  import.meta.env.MODE === "development" ||
-  process.env.NODE_ENV === "development";
-
-// Get the appropriate API URL
-export const API_BASE_URL = isDevelopment ? API_URL_DEV : API_URL_PROD;
+export const API_BASE_URL = (): string => API_URL;
 
 export const CONFIG = {
-  isDevelopment,
-  isProduction: !isDevelopment,
-  apiUrl: API_BASE_URL,
-  socketUrl: API_BASE_URL,
+  get isDevelopment(): boolean {
+    return import.meta.env.MODE === "development";
+  },
+  get isProduction(): boolean {
+    return import.meta.env.MODE === "production";
+  },
+  get apiUrl(): string {
+    return API_URL;
+  },
+  get socketUrl(): string {
+    return API_URL;
+  },
 };
 
 export default CONFIG;
