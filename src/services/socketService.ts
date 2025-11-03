@@ -42,6 +42,9 @@ class SocketService {
         token.substring(0, 20) + "..."
       );
 
+      console.log("DEBUG - CONFIG.socketUrl:", CONFIG.socketUrl);
+      console.log("DEBUG - CONFIG.apiUrl:", CONFIG.apiUrl);
+
       this.socket = io(CONFIG.socketUrl, {
         path: "/socket.io",
         query: {
