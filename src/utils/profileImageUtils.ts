@@ -3,8 +3,7 @@
  * Handles profile image URL generation and related utilities
  */
 
-import axios from "axios";
-import { CONFIG } from "../config";
+import { apiClient } from "../services/apiClient";
 
 /**
  * Cache for profile image data URLs to avoid repeated API calls
@@ -12,22 +11,15 @@ import { CONFIG } from "../config";
 const imageCache = new Map<string, string>();
 
 /**
- * Get the Authorization header with Bearer token
- */
-const getAuthHeader = (): string | null => {
-  const token = localStorage.getItem("token");
-  return token ? `Bearer ${token}` : null;
-};
-
-/**
  * Fetch profile image as data URL (authenticated)
  * @param profileImage - The profile image filename (e.g., "filename.jpg")
  * @returns Promise that resolves to a data URL or null
  */
 export const getProfileImageUrl = async (
-  profileImage?: string
+  profileImage?: string | null
 ): Promise<string | null> => {
-  if (!profileImage) {
+  // Return null for undefined, null, or empty string
+  if (!profileImage || profileImage.trim() === "") {
     console.log("No profile image provided");
     return null;
   }
@@ -38,19 +30,10 @@ export const getProfileImageUrl = async (
   }
 
   try {
-    const token = getAuthHeader();
-    if (!token) {
-      console.warn("No authentication token available");
-      return null;
-    }
-
-    const response = await axios.get(
-      `${CONFIG.apiUrl}/users/uploads/images/${profileImage}`,
-      {
-        headers: { Authorization: token },
-        responseType: "blob",
-      }
-    );
+    const api = apiClient.getAxiosInstance();
+    const response = await api.get(`/users/uploads/images/${profileImage}`, {
+      responseType: "blob",
+    });
 
     // Convert blob to data URL
     const blob = response.data;
