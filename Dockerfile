@@ -1,6 +1,9 @@
 # Multi-stage build for production
 FROM node:20-alpine AS builder
 
+# Accept build argument for API URL
+ARG VITE_API_URL=http://localhost:3000
+
 WORKDIR /app
 
 # Copy package files
@@ -12,8 +15,8 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application with the API URL
+RUN VITE_API_URL=$VITE_API_URL npm run build
 
 # Production stage - lightweight nginx
 FROM nginx:alpine
@@ -26,6 +29,9 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
+
+# Remove default nginx config files to prevent entrypoint warnings
+RUN rm -f /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

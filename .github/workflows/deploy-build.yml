@@ -49,6 +49,8 @@ jobs:
                   tags: |
                       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.web_version }}
                       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+                  build-args: |
+                      VITE_API_URL=${{ vars.VITE_API_URL }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
