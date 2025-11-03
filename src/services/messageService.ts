@@ -3,7 +3,8 @@
  * Handles all message-related API calls
  */
 
-import axios, { AxiosInstance } from "axios";
+import axios from "axios";
+import { apiClient } from "./apiClient";
 import { API_BASE_URL } from "../config";
 
 interface Message {
@@ -23,26 +24,7 @@ interface SendMessageRequest {
 }
 
 class MessageService {
-  private api: AxiosInstance;
-
-  constructor() {
-    this.api = axios.create({
-      baseURL: API_BASE_URL,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  }
-
-  /**
-   * Set authorization header for authenticated requests
-   */
-  private setAuthHeader(): void {
-    const token = localStorage.getItem("token");
-    if (token) {
-      this.api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    }
-  }
+  private api = apiClient.getAxiosInstance();
 
   /**
    * Send message to a user
@@ -52,7 +34,6 @@ class MessageService {
     data: SendMessageRequest
   ): Promise<{ success: boolean }> {
     try {
-      this.setAuthHeader();
       const response = await this.api.post<{ success: boolean }>(
         `/messages/send/${userId}`,
         {
@@ -70,7 +51,6 @@ class MessageService {
    */
   async getMessages(userId: string): Promise<Message[]> {
     try {
-      this.setAuthHeader();
       const response = await this.api.get<Message[]>(`/messages/get/${userId}`);
       return response.data;
     } catch (error) {
@@ -129,7 +109,6 @@ class MessageService {
    */
   async deleteMessages(userId: string): Promise<{ message: string }> {
     try {
-      this.setAuthHeader();
       const response = await this.api.delete(`/messages/delete/${userId}`);
       return response.data;
     } catch (error) {

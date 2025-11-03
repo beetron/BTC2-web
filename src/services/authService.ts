@@ -3,8 +3,8 @@
  * Handles all authentication-related API calls
  */
 
-import axios, { AxiosInstance } from "axios";
-import { API_BASE_URL } from "../config";
+import axios from "axios";
+import { apiClient } from "./apiClient";
 
 interface SignupRequest {
   email: string;
@@ -39,16 +39,7 @@ interface ForgotPasswordRequest {
 }
 
 class AuthService {
-  private api: AxiosInstance;
-
-  constructor() {
-    this.api = axios.create({
-      baseURL: API_BASE_URL,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  }
+  private api = apiClient.getAxiosInstance();
 
   /**
    * Sign up a new user
@@ -172,16 +163,6 @@ class AuthService {
   }
 
   /**
-   * Set authorization header
-   */
-  setAuthHeader(): void {
-    const token = this.getToken();
-    if (token) {
-      this.api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    }
-  }
-
-  /**
    * Handle API errors
    */
   private handleError(error: unknown): Error {
@@ -207,14 +188,6 @@ class AuthService {
       return new Error(error.response.data?.message || error.message);
     }
     return new Error("An unknown error occurred");
-  }
-
-  /**
-   * Get API instance for other services
-   */
-  getApiInstance(): AxiosInstance {
-    this.setAuthHeader();
-    return this.api;
   }
 }
 
