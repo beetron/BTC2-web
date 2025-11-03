@@ -83,7 +83,16 @@ export const Header: React.FC<HeaderProps> = () => {
       <Container size="sm">
         <Group justify="space-between" align="center">
           {/* Logo/Title */}
-          <Box>
+          <Box style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <img
+              src="/src/public/btc2-logo-400x400.png"
+              alt="BTC2 Logo"
+              style={{
+                height: 40,
+                width: 40,
+                objectFit: "contain",
+              }}
+            />
             <Text
               fw={700}
               size="lg"
@@ -91,7 +100,7 @@ export const Header: React.FC<HeaderProps> = () => {
                 fontFamily: "Greycliff CF, var(--mantine-font-family)",
               }}
             >
-              BTC2
+              bTC2
             </Text>
           </Box>
 
