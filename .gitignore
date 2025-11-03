@@ -8,6 +8,7 @@ lerna-debug.log*
 .pnpm-debug.log*
 
 btc-web-deployment.yaml
+k8s-btc-web-deployment.yaml
 
 .env
 .env.development
