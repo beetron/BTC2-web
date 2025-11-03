@@ -18,9 +18,7 @@ yarn-error.log*
 .eslintcache
 coverage
 .nyc_output
-k8s-*.yaml
+btc-web-deployment.yaml
 KUBERNETES_DEPLOYMENT.md
 RUNTIME_CONFIG_SETUP.md
-Dockerfile
-nginx.conf
 README.md

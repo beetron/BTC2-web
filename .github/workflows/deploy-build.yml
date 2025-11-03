@@ -1,4 +1,4 @@
-name: Deploy to Kubernetes
+name: Deploy k8s manifest and update image
 
 on:
     push:
