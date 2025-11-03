@@ -45,8 +45,12 @@ class SocketService {
       console.log("DEBUG - CONFIG.socketUrl:", CONFIG.socketUrl);
       console.log("DEBUG - CONFIG.apiUrl:", CONFIG.apiUrl);
 
-      this.socket = io(CONFIG.socketUrl, {
-        path: "/socket.io",
+      // Extract base URL (scheme + domain) from CONFIG.socketUrl
+      const socketUrlObj = new URL(CONFIG.socketUrl);
+      const socketBaseUrl = `${socketUrlObj.protocol}//${socketUrlObj.host}`;
+
+      this.socket = io(socketBaseUrl, {
+        path: "/btc-api/socket.io",
         query: {
           userId: userId,
         },
