@@ -56,6 +56,15 @@ class AuthService {
         if (response.data.profileImage) {
           localStorage.setItem("userProfileImage", response.data.profileImage);
         }
+        if (response.data.nickname) {
+          localStorage.setItem("nickname", response.data.nickname);
+        }
+        if (response.data.uniqueId) {
+          localStorage.setItem("uniqueId", response.data.uniqueId);
+        }
+        if (response.data.email) {
+          localStorage.setItem("email", response.data.email);
+        }
       }
       return response.data;
     } catch (error) {
@@ -78,6 +87,15 @@ class AuthService {
         if (response.data.profileImage) {
           localStorage.setItem("userProfileImage", response.data.profileImage);
         }
+        if (response.data.nickname) {
+          localStorage.setItem("nickname", response.data.nickname);
+        }
+        if (response.data.uniqueId) {
+          localStorage.setItem("uniqueId", response.data.uniqueId);
+        }
+        if (response.data.email) {
+          localStorage.setItem("email", response.data.email);
+        }
       }
       return response.data;
     } catch (error) {
@@ -98,10 +116,16 @@ class AuthService {
       localStorage.removeItem("token");
       localStorage.removeItem("userId");
       localStorage.removeItem("userProfileImage");
+      localStorage.removeItem("nickname");
+      localStorage.removeItem("uniqueId");
+      localStorage.removeItem("email");
     } catch (error) {
       localStorage.removeItem("token");
       localStorage.removeItem("userId");
       localStorage.removeItem("userProfileImage");
+      localStorage.removeItem("nickname");
+      localStorage.removeItem("uniqueId");
+      localStorage.removeItem("email");
       throw this.handleError(error);
     }
   }

@@ -18,6 +18,7 @@ import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { useEffect, useState, useCallback, useRef, forwardRef } from "react";
 import { messageService } from "../services/messageService";
+import { messageCacheService } from "../services/messageCacheService";
 import { useSocketListener } from "../hooks/useSocketListener";
 import { getProfileImageUrl } from "../utils/profileImageUtils";
 import { loadImageWithAuth } from "../utils/imageLoader";
@@ -40,7 +41,7 @@ interface MessageListProps {
   friendId: string;
   socket: any;
   userProfileImage: string | null;
-  friendProfileImage: string;
+  friendProfileImage?: string;
   onScrollStateChange?: (isScrolledToBottom: boolean) => void;
 }
 
@@ -141,13 +142,21 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
     const loadMessages = useCallback(async () => {
       setIsLoading(true);
       try {
-        const data = await messageService.getMessages(friendId);
+        // Cache-first: Get cached messages immediately
+        const data = await messageService.getMessagesDelta(friendId);
         const sortedMessages = [...data].sort(
           (a, b) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
         setMessages(sortedMessages);
         shouldScrollToBottomRef.current = true;
+
+        // Show cached count
+        if (sortedMessages.length > 0) {
+          console.log(
+            `✓ Displayed ${sortedMessages.length} cached messages for friend ${friendId}`
+          );
+        }
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to load messages";
@@ -160,6 +169,25 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
         setIsLoading(false);
       }
     }, [friendId]);
+
+    // Listen for cache updates and re-render if new messages synced
+    useEffect(() => {
+      const checkForUpdates = async () => {
+        const updated = await messageCacheService.getCachedMessages(friendId);
+        if (updated.length > messages.length) {
+          const sortedMessages = [...updated].sort(
+            (a, b) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+          setMessages(sortedMessages);
+          console.log(`✓ Re-rendered with ${updated.length} total messages`);
+        }
+      };
+
+      // Check for updates every 500ms while background sync might be happening
+      const interval = setInterval(checkForUpdates, 500);
+      return () => clearInterval(interval);
+    }, [friendId, messages.length]);
 
     useEffect(() => {
       loadMessages();

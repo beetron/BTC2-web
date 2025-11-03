@@ -22,17 +22,22 @@ export const MessagesPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { socket } = useSocket();
-  const { userProfileImage } = useAuth();
+  const { userProfileImage: authUserProfileImage } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [userProfileImage, setUserProfileImage] =
+    useState(authUserProfileImage);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true);
+  const friendProfileImage =
+    (location.state as LocationState)?.friendProfileImage || null;
 
-  // Extract friend profile image from Router state
-  const friendProfileImage = (location.state as LocationState)
-    ?.friendProfileImage;
-
-  // Check if we have valid data to render
-  const hasValidData = !!(friendId && friendProfileImage);
+  // Refresh user profile image from localStorage on page load
+  useEffect(() => {
+    const storedProfileImage = localStorage.getItem("userProfileImage");
+    if (storedProfileImage) {
+      setUserProfileImage(storedProfileImage);
+    }
+  }, []);
 
   // All hooks must be called unconditionally
   const handleMessageSent = useCallback(async () => {
@@ -58,15 +63,10 @@ export const MessagesPage: React.FC = () => {
 
   // Validate page access in useEffect
   useEffect(() => {
-    if (!friendId || !friendProfileImage) {
+    if (!friendId) {
       navigate("/friends");
     }
-  }, [friendId, friendProfileImage, navigate]);
-
-  // Don't render if not valid
-  if (!hasValidData) {
-    return null;
-  }
+  }, [friendId, navigate]);
 
   return (
     <Box>
@@ -95,7 +95,7 @@ export const MessagesPage: React.FC = () => {
             friendId={friendId!}
             socket={socket}
             userProfileImage={userProfileImage}
-            friendProfileImage={friendProfileImage!}
+            friendProfileImage={friendProfileImage ?? undefined}
             onScrollStateChange={setIsScrolledToBottom}
           />
 

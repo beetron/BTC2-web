@@ -1,10 +1,11 @@
 /**
  * Message Service
- * Handles all message-related API calls
+ * Handles all message-related API calls with caching support
  */
 
 import axios from "axios";
 import { apiClient } from "./apiClient";
+import { messageCacheService } from "./messageCacheService";
 import { API_BASE_URL } from "../config";
 
 interface Message {
@@ -13,6 +14,7 @@ interface Message {
   receiverId: string;
   message: string;
   image?: string;
+  imageFiles?: string[];
   createdAt: string;
   updatedAt?: string;
   readAt?: string;
@@ -48,13 +50,64 @@ class MessageService {
 
   /**
    * Get conversation history with a user
+   * Uses caching for improved performance on repeated loads
    */
   async getMessages(userId: string): Promise<Message[]> {
     try {
       const response = await this.api.get<Message[]>(`/messages/get/${userId}`);
-      return response.data;
+      const apiMessages = response.data;
+
+      // Cache all messages and return merged result
+      const cachedMessages = await messageCacheService.getMergedMessages(
+        userId,
+        apiMessages
+      );
+      return cachedMessages;
     } catch (error) {
       throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get messages with cache-first strategy
+   * Returns cached messages immediately, fetches new ones in background
+   */
+  async getMessagesDelta(userId: string): Promise<Message[]> {
+    // Return cached messages immediately for instant UI
+    const cached = await messageCacheService.getCachedMessages(userId);
+
+    // Fetch new messages in background (fire and forget)
+    this.syncNewMessagesInBackground(userId).catch((error) => {
+      console.error("Background sync error:", error);
+    });
+
+    return cached;
+  }
+
+  /**
+   * Sync new messages in background without blocking
+   * Updates cache and triggers UI update if new messages found
+   */
+  private async syncNewMessagesInBackground(userId: string): Promise<void> {
+    try {
+      const response = await this.api.get<Message[]>(`/messages/get/${userId}`);
+      const apiMessages = response.data;
+
+      // Get only new messages
+      const newMessages = await messageCacheService.getDeltaMessages(
+        userId,
+        apiMessages
+      );
+
+      // Cache new messages silently
+      if (newMessages.length > 0) {
+        await messageCacheService.cacheMessages(userId, newMessages);
+        console.log(
+          `✓ Synced ${newMessages.length} new messages in background`
+        );
+      }
+    } catch (error) {
+      console.error("Failed to sync messages in background:", error);
     }
   }
 
