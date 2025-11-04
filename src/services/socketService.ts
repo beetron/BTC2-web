@@ -50,7 +50,7 @@ class SocketService {
       const socketBaseUrl = `${socketUrlObj.protocol}//${socketUrlObj.host}`;
 
       this.socket = io(socketBaseUrl, {
-        path: "/btc-api/socket.io",
+        path: CONFIG.isDevelopment ? "/socket.io" : "/btc-api/socket.io",
         query: {
           userId: userId,
         },

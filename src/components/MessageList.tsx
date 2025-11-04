@@ -184,14 +184,16 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
         }
       };
 
-      // Check for updates every 500ms while background sync might be happening
-      const interval = setInterval(checkForUpdates, 500);
-      return () => clearInterval(interval);
-    }, [friendId, messages.length]);
+      if (!isLoading) {
+        // Check for updates every 500ms while background sync might be happening
+        const interval = setInterval(checkForUpdates, 500);
+        return () => clearInterval(interval);
+      }
+    }, [friendId, messages.length, isLoading]);
 
     useEffect(() => {
       loadMessages();
-    }, [friendId]);
+    }, [friendId, loadMessages]);
 
     // Scroll to bottom when messages change or component mounts
     useEffect(() => {

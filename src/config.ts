@@ -1,7 +1,7 @@
 /**
  * Environment Configuration
- * Reads runtime configuration from window object (set by nginx from .env file)
- * Falls back to build-time VITE_API_URL if runtime config unavailable
+ * Uses VITE_API_URL from .env file
+ * In Kubernetes, .env is injected via ConfigMap
  */
 
 declare global {
@@ -13,27 +13,11 @@ declare global {
   interface ImportMeta {
     readonly env: ImportMetaEnv;
   }
-
-  interface Window {
-    __ENV__?: {
-      VITE_API_URL?: string;
-    };
-  }
 }
 
-// Read from runtime config (injected by nginx), fall back to build-time env
-const getApiUrl = (): string => {
-  // Try to read from runtime config injected by nginx
-  if (typeof window !== "undefined" && window.__ENV__?.VITE_API_URL) {
-    return window.__ENV__.VITE_API_URL;
-  }
-  // Fall back to build-time environment variable
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  // Default fallback
-  return "http://localhost:3000";
-};
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+export const API_BASE_URL = (): string => API_URL;
 
 export const CONFIG = {
   get isDevelopment(): boolean {
@@ -43,10 +27,10 @@ export const CONFIG = {
     return import.meta.env.MODE === "production";
   },
   get apiUrl(): string {
-    return getApiUrl();
+    return API_URL;
   },
   get socketUrl(): string {
-    return getApiUrl();
+    return API_URL;
   },
 };
 
