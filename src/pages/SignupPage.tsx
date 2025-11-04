@@ -21,7 +21,8 @@ import { AuthHeader } from "../components/AuthHeader";
 export const SignupPage: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [nickname, setNickname] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [username, setUsername] = useState("");
   const [uniqueId, setUniqueId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { signup } = useAuth();
@@ -30,7 +31,7 @@ export const SignupPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email || !password || !nickname || !uniqueId) {
+    if (!email || !password || !confirmPassword || !username || !uniqueId) {
       notifications.show({
         title: "Validation Error",
         message: "Please fill in all fields",
@@ -48,12 +49,24 @@ export const SignupPage: React.FC = () => {
       return;
     }
 
+    if (password !== confirmPassword) {
+      notifications.show({
+        title: "Validation Error",
+        message: "Passwords do not match",
+        color: "red",
+      });
+      return;
+    }
+
     setIsLoading(true);
     try {
-      await signup(email, password, nickname, uniqueId);
+      const response = await signup(username, password, email, uniqueId);
+      // Use server success message if available, otherwise use default
+      const successMessage =
+        response?.message || "Account created successfully";
       notifications.show({
         title: "Success",
-        message: "Account created successfully",
+        message: successMessage,
         color: "green",
       });
       navigate("/chat");
@@ -79,10 +92,15 @@ export const SignupPage: React.FC = () => {
             fontFamily: "Greycliff CF, var(--mantine-font-family)",
             fontWeight: 900,
           }}
-          mb={50}
+          mb={20}
         >
           Create Account
         </Title>
+
+        <Text ta="start" c="dimmed" size="sm" mb={30}>
+          BTC2 is an invite-only chat application. You need a unique ID from an
+          existing user to create an account.
+        </Text>
 
         <form onSubmit={handleSubmit}>
           <Stack gap="lg">
@@ -98,18 +116,18 @@ export const SignupPage: React.FC = () => {
             />
 
             <TextInput
-              label="Nickname"
-              placeholder="Your nickname"
-              value={nickname}
-              onChange={(e) => setNickname(e.currentTarget.value)}
+              label="Username"
+              placeholder="Username for log in"
+              value={username}
+              onChange={(e) => setUsername(e.currentTarget.value)}
               leftSection={<IconUser size={16} />}
               disabled={isLoading}
               required
             />
 
             <TextInput
-              label="Unique ID"
-              placeholder="Your unique username"
+              label="Friend's Unique ID"
+              placeholder="Your friend's unique ID"
               value={uniqueId}
               onChange={(e) => setUniqueId(e.currentTarget.value)}
               leftSection={<IconId size={16} />}
@@ -122,6 +140,15 @@ export const SignupPage: React.FC = () => {
               placeholder="Your password"
               value={password}
               onChange={(e) => setPassword(e.currentTarget.value)}
+              disabled={isLoading}
+              required
+            />
+
+            <PasswordInput
+              label="Confirm Password"
+              placeholder="Confirm your password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.currentTarget.value)}
               disabled={isLoading}
               required
             />
