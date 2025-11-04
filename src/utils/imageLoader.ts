@@ -5,7 +5,17 @@
 
 import { authService } from "../services/authService";
 
-const imageCache = new Map<string, string>();
+const imageCaches = new Map<string, Map<string, string>>();
+
+/**
+ * Get or create cache for specific user
+ */
+const getUserImageCache = (userId: string): Map<string, string> => {
+  if (!imageCaches.has(userId)) {
+    imageCaches.set(userId, new Map<string, string>());
+  }
+  return imageCaches.get(userId)!;
+};
 
 /**
  * Load image from URL with auth headers and return data URL
@@ -13,6 +23,13 @@ const imageCache = new Map<string, string>();
  * @returns Promise<string> - Data URL for the image
  */
 export const loadImageWithAuth = async (imageUrl: string): Promise<string> => {
+  const userId = localStorage.getItem("userId");
+  if (!userId) {
+    throw new Error("No user ID available for image caching");
+  }
+
+  const imageCache = getUserImageCache(userId);
+  
   // Check cache first
   if (imageCache.has(imageUrl)) {
     return imageCache.get(imageUrl)!;
@@ -58,8 +75,25 @@ export const loadImageWithAuth = async (imageUrl: string): Promise<string> => {
 };
 
 /**
- * Clear image cache (call on logout)
+ * Clear image cache for specific user (call on logout)
  */
-export const clearImageCache = () => {
-  imageCache.clear();
+export const clearImageCache = (userId?: string) => {
+  if (userId) {
+    imageCaches.delete(userId);
+    console.log(`✓ Cleared image cache for user ${userId}`);
+  } else {
+    // Clear all image caches if no userId provided
+    imageCaches.clear();
+    console.log("✓ Cleared all image caches");
+  }
+};
+
+/**
+ * Clear current user's image cache
+ */
+export const clearCurrentUserImageCache = () => {
+  const userId = localStorage.getItem("userId");
+  if (userId) {
+    clearImageCache(userId);
+  }
 };

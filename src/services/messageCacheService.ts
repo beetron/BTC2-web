@@ -18,17 +18,77 @@ interface CachedMessage {
   friendId?: string;
 }
 
-const DB_NAME = "BTC2ChatCache";
+const DB_NAME_PREFIX = "BTC2ChatCache";
 const DB_VERSION = 2;
 const MESSAGES_STORE = "messages";
 const METADATA_STORE = "metadata";
 
 class MessageCacheService {
   private db: IDBDatabase | null = null;
+  private currentUserId: string | null = null;
 
-  async initializeDB(): Promise<void> {
+  /**
+   * Get user-specific database name
+   */
+  private getUserDBName(userId: string): string {
+    return `${DB_NAME_PREFIX}_${userId}`;
+  }
+
+  /**
+   * Set current user and close existing DB if user changed
+   */
+  setCurrentUser(userId: string | null): void {
+    if (this.currentUserId !== userId) {
+      if (this.db) {
+        this.db.close();
+        this.db = null;
+      }
+      this.currentUserId = userId;
+    }
+  }
+
+  /**
+   * Clear cache for a specific user (when they log out)
+   */
+  async clearUserCache(userId: string): Promise<void> {
+    const dbName = this.getUserDBName(userId);
+    
+    // Close current connection if it's for this user
+    if (this.currentUserId === userId && this.db) {
+      this.db.close();
+      this.db = null;
+      this.currentUserId = null;
+    }
+
+    // Delete the user's database
+    return new Promise<void>((resolve, reject) => {
+      const deleteRequest = indexedDB.deleteDatabase(dbName);
+      
+      deleteRequest.onsuccess = () => {
+        console.log(`✓ Cleared all cache for user ${userId}`);
+        resolve();
+      };
+      
+      deleteRequest.onerror = () => {
+        console.error(`Failed to clear cache for user ${userId}:`, deleteRequest.error);
+        reject(deleteRequest.error);
+      };
+    });
+  }
+
+  async initializeDB(userId?: string): Promise<void> {
+    if (!userId) {
+      const storedUserId = localStorage.getItem("userId");
+      if (!storedUserId) {
+        throw new Error("No user ID available for cache initialization");
+      }
+      userId = storedUserId;
+    }
+
+    this.setCurrentUser(userId);
+    const dbName = this.getUserDBName(userId);
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      const request = indexedDB.open(dbName, DB_VERSION);
 
       request.onerror = () => {
         console.error("Failed to open IndexedDB:", request.error);
@@ -62,9 +122,17 @@ class MessageCacheService {
     });
   }
 
-  private async ensureDB(): Promise<IDBDatabase> {
-    if (!this.db) {
-      await this.initializeDB();
+  private async ensureDB(userId?: string): Promise<IDBDatabase> {
+    if (!userId) {
+      const storedUserId = localStorage.getItem("userId");
+      if (!storedUserId) {
+        throw new Error("No user ID available for database operations");
+      }
+      userId = storedUserId;
+    }
+
+    if (!this.db || this.currentUserId !== userId) {
+      await this.initializeDB(userId);
     }
     return this.db!;
   }
@@ -209,36 +277,23 @@ class MessageCacheService {
   }
 
   async clearAllCache(): Promise<void> {
-    const db = await this.ensureDB();
-    const transaction = db.transaction(
-      [MESSAGES_STORE, METADATA_STORE],
-      "readwrite"
-    );
-
-    try {
-      for (const storeName of [MESSAGES_STORE, METADATA_STORE]) {
-        const store = transaction.objectStore(storeName);
-        await new Promise<void>((resolve) => {
-          const request = store.clear();
-          request.onsuccess = () => resolve();
-          request.onerror = () => resolve();
-        });
-      }
-
-      console.log("✓ Cleared all cache");
-    } catch (error) {
-      console.error("Error clearing all cache:", error);
+    const userId = localStorage.getItem("userId");
+    if (!userId) {
+      console.warn("No user ID available for cache clearing");
+      return;
     }
+    
+    await this.clearUserCache(userId);
   }
 
   async getCacheStats(): Promise<{
     totalMessages: number;
     conversationCount: number;
   }> {
-    const db = await this.ensureDB();
-    const transaction = db.transaction([MESSAGES_STORE], "readonly");
-
     try {
+      const db = await this.ensureDB();
+      const transaction = db.transaction([MESSAGES_STORE], "readonly");
+
       const messagesCount = await new Promise<number>((resolve) => {
         const request = transaction.objectStore(MESSAGES_STORE).count();
         request.onsuccess = () => resolve(request.result);

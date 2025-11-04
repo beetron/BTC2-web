@@ -22,8 +22,9 @@ import {
 import { notifications } from "@mantine/notifications";
 import { IconAlertCircle, IconUpload } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { userService } from "../services/userService";
-import { authService } from "../services/authService";
 import { Header } from "../components/Header";
 import { getProfileImageUrl } from "../utils/profileImageUtils";
 
@@ -93,6 +94,8 @@ const validatePassword = (password: string): string | null => {
 };
 
 export const SettingsPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { deleteAccount } = useAuth();
   const [nickname, setNickname] = useState("");
   const [uniqueId, setUniqueId] = useState("");
   const [currentEmail, setCurrentEmail] = useState("");
@@ -391,13 +394,14 @@ export const SettingsPage: React.FC = () => {
   const handleDeleteAccount = async () => {
     setIsLoading(true);
     try {
-      await authService.deleteAccount();
+      await deleteAccount();
       notifications.show({
         title: "Success",
         message: "Account deleted successfully",
         color: "green",
       });
-      // The logout in deleteAccount will clear localStorage, app should redirect
+      // Navigate to login page after successful account deletion
+      navigate("/login");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to delete account";

@@ -6,6 +6,9 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { authService } from "../services/authService";
 import { clearImageCache } from "../utils/imageLoader";
+import { clearProfileImageCache } from "../utils/profileImageUtils";
+import { clearProfileImageCacheForUser } from "../hooks/useProfileImageCache";
+import { messageCacheService } from "../services/messageCacheService";
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -20,6 +23,7 @@ interface AuthContextType {
     uniqueId: string
   ) => Promise<any>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   forgotUsername: (email: string) => Promise<void>;
   forgotPassword: (username: string, email: string) => Promise<void>;
   error: string | null;
@@ -51,11 +55,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const login = async (username: string, password: string) => {
     setIsLoading(true);
     setError(null);
+    
+    // Get previous user ID to detect user changes
+    const previousUserId = localStorage.getItem("userId");
+    
     try {
       const response = (await authService.login({ username, password })) as any;
-      const userId = response.userId || response._id;
+      const newUserId = response.userId || response._id;
+      
+      // If user changed, clear previous user's cache
+      if (previousUserId && previousUserId !== newUserId) {
+        console.log(`User changed from ${previousUserId} to ${newUserId}, clearing caches`);
+        await messageCacheService.clearUserCache(previousUserId);
+        clearImageCache(previousUserId);
+        clearProfileImageCache(previousUserId);
+        clearProfileImageCacheForUser(previousUserId);
+      }
+      
       setIsAuthenticated(true);
-      setUserId(userId || null);
+      setUserId(newUserId || null);
       setUserProfileImage(response.profileImage || null);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed";
@@ -74,6 +92,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   ) => {
     setIsLoading(true);
     setError(null);
+    
+    // Get previous user ID to detect user changes
+    const previousUserId = localStorage.getItem("userId");
+    
     try {
       const response = (await authService.signup({
         username,
@@ -81,9 +103,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         password,
         uniqueId,
       })) as any;
-      const userId = response.userId || response._id;
+      const newUserId = response.userId || response._id;
+      
+      // If user changed, clear previous user's cache
+      if (previousUserId && previousUserId !== newUserId) {
+        console.log(`User changed from ${previousUserId} to ${newUserId}, clearing caches`);
+        await messageCacheService.clearUserCache(previousUserId);
+        clearImageCache(previousUserId);
+        clearProfileImageCache(previousUserId);
+        clearProfileImageCacheForUser(previousUserId);
+      }
+      
       setIsAuthenticated(true);
-      setUserId(userId || null);
+      setUserId(newUserId || null);
       setUserProfileImage(response.profileImage || null);
       return response; // Return the response so SignupPage can access success message
     } catch (err) {
@@ -98,9 +130,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const logout = async () => {
     setIsLoading(true);
     setError(null);
+    
+    // Get current user ID before logout
+    const currentUserId = userId || localStorage.getItem("userId");
+    
     try {
       await authService.logout();
-      clearImageCache();
+      
+      // Clear all user-specific caches
+      if (currentUserId) {
+        await messageCacheService.clearUserCache(currentUserId);
+        clearImageCache(currentUserId);
+        clearProfileImageCache(currentUserId);
+        clearProfileImageCacheForUser(currentUserId);
+      } else {
+        // Fallback: clear all caches if no user ID
+        clearImageCache();
+        clearProfileImageCache();
+      }
+      
       setIsAuthenticated(false);
       setUserId(null);
       setUserProfileImage(null);
@@ -135,6 +183,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const deleteAccount = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    // Get current user ID before deletion
+    const currentUserId = userId || localStorage.getItem("userId");
+    
+    try {
+      await authService.deleteAccount();
+      
+      // Clear all user-specific caches (deleteAccount already calls logout)
+      if (currentUserId) {
+        await messageCacheService.clearUserCache(currentUserId);
+        clearImageCache(currentUserId);
+        clearProfileImageCache(currentUserId);
+        clearProfileImageCacheForUser(currentUserId);
+      } else {
+        // Fallback: clear all caches if no user ID
+        clearImageCache();
+        clearProfileImageCache();
+      }
+      
+      setIsAuthenticated(false);
+      setUserId(null);
+      setUserProfileImage(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Account deletion failed";
+      setError(message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const clearError = () => setError(null);
 
   return (
@@ -147,6 +229,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         login,
         signup,
         logout,
+        deleteAccount,
         forgotUsername,
         forgotPassword,
         error,
