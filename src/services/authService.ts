@@ -7,9 +7,9 @@ import axios from "axios";
 import { apiClient } from "./apiClient";
 
 interface SignupRequest {
-  email: string;
+  username: string;
   password: string;
-  nickname: string;
+  email: string;
   uniqueId: string;
 }
 
@@ -191,25 +191,35 @@ class AuthService {
    */
   private handleError(error: unknown): Error {
     if (axios.isAxiosError(error)) {
-      // Handle HTTP errors with status codes
+      // First, try to get server message
+      const serverMessage =
+        error.response?.data?.message || error.response?.data?.error;
+
+      if (serverMessage) {
+        return new Error(serverMessage);
+      }
+
+      // Fallback to generic messages based on status code
       if (error.response?.status === 400) {
-        return new Error("Invalid login");
+        return new Error("Bad request");
       }
       if (error.response?.status === 401) {
-        return new Error("Invalid login");
+        return new Error("Unauthorized");
       }
       if (error.response?.status === 404) {
-        return new Error("Invalid data");
+        return new Error("Not found");
       }
       if (error.response?.status === 500) {
         return new Error("Server error");
       }
+
       // Handle network/connection errors
       if (!error.response) {
         return new Error("Connection failed");
       }
-      // Use server message if available
-      return new Error(error.response.data?.message || error.message);
+
+      // Use axios default error message as final fallback
+      return new Error(error.message);
     }
     return new Error("An unknown error occurred");
   }
