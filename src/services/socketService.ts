@@ -42,9 +42,6 @@ class SocketService {
         token.substring(0, 20) + "..."
       );
 
-      console.log("DEBUG - CONFIG.socketUrl:", CONFIG.socketUrl);
-      console.log("DEBUG - CONFIG.apiUrl:", CONFIG.apiUrl);
-
       // Extract base URL (scheme + domain) from CONFIG.socketUrl
       const socketUrlObj = new URL(CONFIG.socketUrl);
       const socketBaseUrl = `${socketUrlObj.protocol}//${socketUrlObj.host}`;
