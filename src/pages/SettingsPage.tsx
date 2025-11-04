@@ -17,11 +17,13 @@ import {
   Alert,
   Avatar,
   Center,
+  Modal,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconAlertCircle, IconUpload } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { userService } from "../services/userService";
+import { authService } from "../services/authService";
 import { Header } from "../components/Header";
 import { getProfileImageUrl } from "../utils/profileImageUtils";
 
@@ -108,6 +110,7 @@ export const SettingsPage: React.FC = () => {
     string | null
   >(null);
   const [isLoadingCurrentImage, setIsLoadingCurrentImage] = useState(true);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   useEffect(() => {
     // Load user info from local storage on mount
@@ -385,6 +388,30 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    setIsLoading(true);
+    try {
+      await authService.deleteAccount();
+      notifications.show({
+        title: "Success",
+        message: "Account deleted successfully",
+        color: "green",
+      });
+      // The logout in deleteAccount will clear localStorage, app should redirect
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to delete account";
+      notifications.show({
+        title: "Error",
+        message,
+        color: "red",
+      });
+    } finally {
+      setIsLoading(false);
+      setDeleteModalOpen(false);
+    }
+  };
+
   return (
     <>
       <Header />
@@ -396,6 +423,7 @@ export const SettingsPage: React.FC = () => {
             <Tabs.Tab value="profile">Profile</Tabs.Tab>
             <Tabs.Tab value="image">Profile Image</Tabs.Tab>
             <Tabs.Tab value="email">Email & Password</Tabs.Tab>
+            <Tabs.Tab value="delete">Delete Account</Tabs.Tab>
           </Tabs.List>
 
           {/* Profile Tab */}
@@ -410,7 +438,7 @@ export const SettingsPage: React.FC = () => {
                     value={nickname}
                     onChange={(e) => setNickname(e.currentTarget.value)}
                     disabled={isLoading}
-                    style={{ flex: 1 }}
+                    w="50%"
                   />
                   <Button onClick={handleUpdateNickname} loading={isLoading}>
                     Update
@@ -428,7 +456,7 @@ export const SettingsPage: React.FC = () => {
                     onChange={(e) => setUniqueId(e.currentTarget.value)}
                     placeholder="Your unique ID"
                     disabled={isLoading}
-                    style={{ flex: 1 }}
+                    w="50%"
                   />
                   <Button onClick={handleUpdateUniqueId} loading={isLoading}>
                     Update
@@ -531,6 +559,7 @@ export const SettingsPage: React.FC = () => {
                     value={email}
                     onChange={(e) => setEmail(e.currentTarget.value)}
                     disabled={isLoading}
+                    w="50%"
                   />
                   <PasswordInput
                     label="Current Password"
@@ -540,8 +569,9 @@ export const SettingsPage: React.FC = () => {
                       setEmailChangePassword(e.currentTarget.value)
                     }
                     disabled={isLoading}
+                    w="50%"
                   />
-                  <Button onClick={handleUpdateEmail} loading={isLoading}>
+                  <Button onClick={handleUpdateEmail} loading={isLoading} w="50%">
                     Update Email
                   </Button>
                 </Stack>
@@ -557,6 +587,7 @@ export const SettingsPage: React.FC = () => {
                   title="Info"
                   color="blue"
                   mb="md"
+                  w="50%"
                 >
                   Leave fields empty to skip password change
                 </Alert>
@@ -567,6 +598,7 @@ export const SettingsPage: React.FC = () => {
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.currentTarget.value)}
                     disabled={isLoading}
+                    w="50%"
                   />
                   <PasswordInput
                     label="New Password"
@@ -574,6 +606,7 @@ export const SettingsPage: React.FC = () => {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.currentTarget.value)}
                     disabled={isLoading}
+                    w="50%"
                   />
                   <PasswordInput
                     label="Confirm Password"
@@ -581,16 +614,51 @@ export const SettingsPage: React.FC = () => {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.currentTarget.value)}
                     disabled={isLoading}
+                    w="50%"
                   />
-                  <Button onClick={handleChangePassword} loading={isLoading}>
+                  <Button onClick={handleChangePassword} loading={isLoading} w="50%">
                     Change Password
                   </Button>
                 </Stack>
               </Box>
             </Stack>
           </Tabs.Panel>
+
+          {/* Delete Account Tab */}
+          <Tabs.Panel value="delete" pt="xl">
+            <Stack gap="lg">
+              <Alert
+                icon={<IconAlertCircle size={16} />}
+                title="Warning"
+                color="red"
+              >
+                This action is irreversible. Deleting your account will permanently remove all your data, including messages, friends, and profile information. You will not be able to recover your account.
+              </Alert>
+              <Button color="red" w="50%" mx="auto" onClick={() => setDeleteModalOpen(true)}>
+                Delete Account
+              </Button>
+            </Stack>
+          </Tabs.Panel>
         </Tabs>
       </Container>
+
+      <Modal
+        opened={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        title="Confirm Account Deletion"
+      >
+        <Text>
+          Are you sure you want to delete your account? This action cannot be undone.
+        </Text>
+        <Group mt="md">
+          <Button variant="default" onClick={() => setDeleteModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button color="red" onClick={handleDeleteAccount}>
+            Delete
+          </Button>
+        </Group>
+      </Modal>
     </>
   );
 };

@@ -159,8 +159,21 @@ class AuthService {
   }
 
   /**
-   * Get stored token
+   * Delete user account
    */
+  async deleteAccount(): Promise<void> {
+    const userId = this.getUserId();
+    if (!userId) {
+      throw new Error("User ID not found");
+    }
+    try {
+      await this.api.delete(`/auth/deleteaccount/${userId}`);
+      // After successful deletion, logout to clear local storage
+      await this.logout();
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
   getToken(): string | null {
     return localStorage.getItem("token");
   }
