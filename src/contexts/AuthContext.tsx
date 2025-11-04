@@ -14,11 +14,11 @@ interface AuthContextType {
   userProfileImage: string | null;
   login: (username: string, password: string) => Promise<void>;
   signup: (
-    email: string,
+    username: string,
     password: string,
-    nickname: string,
+    email: string,
     uniqueId: string
-  ) => Promise<void>;
+  ) => Promise<any>;
   logout: () => Promise<void>;
   forgotUsername: (email: string) => Promise<void>;
   forgotPassword: (username: string, email: string) => Promise<void>;
@@ -67,24 +67,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const signup = async (
-    email: string,
+    username: string,
     password: string,
-    nickname: string,
+    email: string,
     uniqueId: string
   ) => {
     setIsLoading(true);
     setError(null);
     try {
       const response = (await authService.signup({
+        username,
         email,
         password,
-        nickname,
         uniqueId,
       })) as any;
       const userId = response.userId || response._id;
       setIsAuthenticated(true);
       setUserId(userId || null);
       setUserProfileImage(response.profileImage || null);
+      return response; // Return the response so SignupPage can access success message
     } catch (err) {
       const message = err instanceof Error ? err.message : "Signup failed";
       setError(message);
