@@ -98,6 +98,7 @@ export const SettingsPage: React.FC = () => {
   const { deleteAccount } = useAuth();
   const [nickname, setNickname] = useState("");
   const [uniqueId, setUniqueId] = useState("");
+  const [username, setUsername] = useState("");
   const [currentEmail, setCurrentEmail] = useState("");
   const [email, setEmail] = useState("");
   const [emailChangePassword, setEmailChangePassword] = useState("");
@@ -117,11 +118,13 @@ export const SettingsPage: React.FC = () => {
 
   useEffect(() => {
     // Load user info from local storage on mount
+    const storedUsername = localStorage.getItem("username");
     const storedNickname = localStorage.getItem("nickname");
     const storedUniqueId = localStorage.getItem("uniqueId");
     const storedEmail = localStorage.getItem("email");
     const storedProfileImage = localStorage.getItem("userProfileImage");
 
+    if (storedUsername) setUsername(storedUsername);
     if (storedNickname) setNickname(storedNickname);
     if (storedUniqueId) setUniqueId(storedUniqueId);
     if (storedEmail) {
@@ -434,9 +437,24 @@ export const SettingsPage: React.FC = () => {
           <Tabs.Panel value="profile" pt="xl">
             <Stack gap="lg">
               <Box>
-                <Text fw={500} mb="sm">
-                  Nickname
-                </Text>
+                <Group gap="xs" align="center">
+                  <Text fw={500}>
+                    Username:
+                  </Text>
+                  <Text size="md" c="blue">
+                    {username}
+                  </Text>
+                </Group>
+              </Box>
+              <Box>
+                <Group gap="xs" align="center">
+                  <Text fw={500} mb="sm">
+                    Nickname
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    *shown to others
+                  </Text>
+                </Group>
                 <Group gap="xs">
                   <TextInput
                     value={nickname}
@@ -451,9 +469,14 @@ export const SettingsPage: React.FC = () => {
               </Box>
 
               <Box>
-                <Text fw={500} mb="sm">
-                  Unique ID
-                </Text>
+                <Group gap="xs" align="center">
+                  <Text fw={500} mb="sm">
+                    Unique ID
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    *used for friend requests
+                  </Text>
+                </Group>
                 <Group gap="xs">
                   <TextInput
                     value={uniqueId}
