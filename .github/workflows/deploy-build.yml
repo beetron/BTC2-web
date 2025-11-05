@@ -1,4 +1,4 @@
-name: Deploy k8s manifest and update image
+name: Deploy image & update k8s deployment
 
 on:
     push:
@@ -76,7 +76,7 @@ jobs:
                   IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
                   echo "Updating image to: $IMAGE_NAME"
 
-                  yq eval 'select(.kind == "Deployment") | .spec.template.spec.containers[0].image = "'"$IMAGE_NAME"'"' -i ${{ env.DEPLOYMENT_FILE }}
+                  yq eval '(. | select(.kind == "Deployment") | .spec.template.spec.containers[0].image) |= "'"$IMAGE_NAME"'"' -i ${{ env.DEPLOYMENT_FILE }}
 
                   echo "Updated deployment YAML:"
                   cat ${{ env.DEPLOYMENT_FILE }} | grep "image:"
