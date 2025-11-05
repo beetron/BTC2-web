@@ -120,12 +120,12 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
                 console.error(`Failed to load image ${filename}:`, error);
                 failedImages.add(filename);
                 // Show error notification for failed images
-                notifications.show({
-                  title: "Image Load Failed",
-                  message: `Could not load image: ${filename}`,
-                  color: "red",
-                  autoClose: 3000,
-                });
+                // notifications.show({
+                //   title: "Image Load Failed",
+                //   message: `Could not load image: ${filename}`,
+                //   color: "red",
+                //   autoClose: 3000,
+                // });
               }
             }
           }
