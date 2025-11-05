@@ -9,6 +9,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { ProtectedRoute } from "../components/ProtectedRoute";
+import { RootRedirect } from "../components/RootRedirect";
 import { FriendListPage } from "../pages/FriendListPage";
 import { MessagesPage } from "../pages/MessagesPage.tsx";
 import { LoginPage } from "../pages/LoginPage";
@@ -62,8 +63,8 @@ export const AppRouter: React.FC = () => {
           }
         />
 
-        {/* Redirect */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        {/* Root Route - Smart redirect based on authentication */}
+        <Route path="/" element={<RootRedirect />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>
