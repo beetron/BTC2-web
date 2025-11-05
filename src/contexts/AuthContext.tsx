@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { authService } from "../services/authService";
+import { authEventEmitter } from "../services/apiClient";
 import { clearImageCache } from "../utils/imageLoader";
 import { clearProfileImageCache } from "../utils/profileImageUtils";
 import { clearProfileImageCacheForUser } from "../hooks/useProfileImageCache";
@@ -50,6 +51,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setUserId(storedUserId);
     setUserProfileImage(storedProfileImage);
     setIsLoading(false);
+
+    // Subscribe to auth expiration events (401/403 responses)
+    const unsubscribe = authEventEmitter.subscribe(async () => {
+      console.log("Authentication token expired, logging out...");
+      
+      // Get current user ID from localStorage (don't use state variable due to closure)
+      const currentUserId = localStorage.getItem("userId");
+      
+      // Clear all user-specific caches
+      if (currentUserId) {
+        await messageCacheService.clearUserCache(currentUserId);
+        clearImageCache(currentUserId);
+        clearProfileImageCache(currentUserId);
+        clearProfileImageCacheForUser(currentUserId);
+      } else {
+        // Fallback: clear all caches if no user ID
+        clearImageCache();
+        clearProfileImageCache();
+      }
+      
+      // Update auth state
+      setIsAuthenticated(false);
+      setUserId(null);
+      setUserProfileImage(null);
+      setError("Your session has expired. Please login again.");
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const login = async (username: string, password: string) => {

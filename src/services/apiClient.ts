@@ -8,6 +8,22 @@
 import axios, { AxiosInstance } from "axios";
 import { CONFIG } from "../config";
 
+// Event emitter for authentication events
+class AuthEventEmitter {
+  private listeners: Set<() => void> = new Set();
+
+  subscribe(callback: () => void): () => void {
+    this.listeners.add(callback);
+    return () => this.listeners.delete(callback);
+  }
+
+  emit(): void {
+    this.listeners.forEach((callback) => callback());
+  }
+}
+
+export const authEventEmitter = new AuthEventEmitter();
+
 class ApiClient {
   private static instance: ApiClient;
   private api: AxiosInstance;
@@ -32,6 +48,30 @@ class ApiClient {
         return config;
       },
       (error) => {
+        return Promise.reject(error);
+      }
+    );
+
+    // Add response interceptor to handle auth expiration
+    this.api.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        // Check if the error is a 401 (Unauthorized) or 403 (Forbidden)
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          // Clear auth data
+          localStorage.removeItem("token");
+          localStorage.removeItem("userId");
+          localStorage.removeItem("username");
+          localStorage.removeItem("userProfileImage");
+          localStorage.removeItem("nickname");
+          localStorage.removeItem("uniqueId");
+          localStorage.removeItem("email");
+
+          // Emit event to notify AuthContext
+          authEventEmitter.emit();
+
+          // Return the error so the calling code can handle it
+        }
         return Promise.reject(error);
       }
     );

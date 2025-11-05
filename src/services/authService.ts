@@ -23,6 +23,7 @@ interface AuthResponse {
   token: string;
   userId?: string;
   _id?: string;
+  username: string;
   nickname: string;
   uniqueId: string;
   email: string;
@@ -52,6 +53,9 @@ class AuthService {
         const userId = response.data.userId || response.data._id;
         if (userId) {
           localStorage.setItem("userId", userId);
+        }
+        if (response.data.username) {
+          localStorage.setItem("username", response.data.username);
         }
         if (response.data.profileImage) {
           localStorage.setItem("userProfileImage", response.data.profileImage);
@@ -84,6 +88,9 @@ class AuthService {
         if (userId) {
           localStorage.setItem("userId", userId);
         }
+        if (response.data.username) {
+          localStorage.setItem("username", response.data.username);
+        }
         if (response.data.profileImage) {
           localStorage.setItem("userProfileImage", response.data.profileImage);
         }
@@ -115,6 +122,7 @@ class AuthService {
       }
       localStorage.removeItem("token");
       localStorage.removeItem("userId");
+      localStorage.removeItem("username");
       localStorage.removeItem("userProfileImage");
       localStorage.removeItem("nickname");
       localStorage.removeItem("uniqueId");
@@ -122,6 +130,7 @@ class AuthService {
     } catch (error) {
       localStorage.removeItem("token");
       localStorage.removeItem("userId");
+      localStorage.removeItem("username");
       localStorage.removeItem("userProfileImage");
       localStorage.removeItem("nickname");
       localStorage.removeItem("uniqueId");

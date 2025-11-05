@@ -46,7 +46,7 @@ export const LoginPage: React.FC = () => {
         message: "Logged in successfully",
         color: "green",
       });
-      navigate("/chat");
+      navigate("/friends");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Login failed";
       notifications.show({

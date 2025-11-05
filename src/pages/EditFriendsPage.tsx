@@ -29,6 +29,7 @@ import { useEffect, useState } from "react";
 import { userService } from "../services/userService";
 import { notifications } from "@mantine/notifications";
 import { Header } from "../components/Header";
+import { getProfileImageUrl } from "../utils/profileImageUtils";
 
 interface Friend {
   _id: string;
@@ -52,6 +53,12 @@ export const EditFriendsPage: React.FC = () => {
   const [loadingFriends, setLoadingFriends] = useState(true);
   const [addingFriend, setAddingFriend] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [friendProfileImages, setFriendProfileImages] = useState<
+    Record<string, string | null>
+  >({});
+  const [requestProfileImages, setRequestProfileImages] = useState<
+    Record<string, string | null>
+  >({});
 
   useEffect(() => {
     loadFriendRequests();
@@ -63,6 +70,16 @@ export const EditFriendsPage: React.FC = () => {
     try {
       const data = await userService.getFriendRequests();
       setFriendRequests(data);
+
+      // Load profile images for all requests
+      const images: Record<string, string | null> = {};
+      for (const request of data) {
+        if (request.profileImage) {
+          const url = await getProfileImageUrl(request.profileImage);
+          images[request._id] = url;
+        }
+      }
+      setRequestProfileImages(images);
     } catch (error) {
       const message =
         error instanceof Error
@@ -83,6 +100,16 @@ export const EditFriendsPage: React.FC = () => {
     try {
       const data = await userService.getFriendList();
       setFriendList(data);
+
+      // Load profile images for all friends
+      const images: Record<string, string | null> = {};
+      for (const friend of data) {
+        if (friend.profileImage) {
+          const url = await getProfileImageUrl(friend.profileImage);
+          images[friend._id] = url;
+        }
+      }
+      setFriendProfileImages(images);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to load friends";
@@ -250,7 +277,7 @@ export const EditFriendsPage: React.FC = () => {
                     <Group justify="space-between">
                       <Group>
                         <Avatar
-                          src={request.profileImage}
+                          src={requestProfileImages[request._id]}
                           size="lg"
                           radius="md"
                           color="blue"
@@ -306,7 +333,7 @@ export const EditFriendsPage: React.FC = () => {
                     <Group justify="space-between">
                       <Group>
                         <Avatar
-                          src={friend.profileImage}
+                          src={friendProfileImages[friend._id]}
                           size="lg"
                           radius="md"
                           color="blue"

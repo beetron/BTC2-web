@@ -63,8 +63,8 @@ export const AppRouter: React.FC = () => {
         />
 
         {/* Redirect */}
-        <Route path="/" element={<Navigate to="/friends" replace />} />
-        <Route path="*" element={<Navigate to="/friends" replace />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>
   );
