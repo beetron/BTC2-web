@@ -3,7 +3,7 @@
  * Validates file size and type for message uploads
  */
 
-const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB
+const MAX_FILE_SIZE = 49 * 1024 * 1024; // 49MB (Backend limit is 50MB)
 const MAX_FILES = 10;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
