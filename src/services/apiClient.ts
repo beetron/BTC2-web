@@ -52,12 +52,26 @@ class ApiClient {
       }
     );
 
-    // Add response interceptor to handle auth expiration
+    // Add response interceptor to handle auth expiration and critical errors
     this.api.interceptors.response.use(
       (response) => response,
       (error) => {
-        // Check if the error is a 401 (Unauthorized) or 403 (Forbidden)
-        if (error.response?.status === 401 || error.response?.status === 403) {
+        const status = error.response?.status;
+
+        // Handle authentication errors (401, 403) or critical server errors (500)
+        // 500 errors indicate something critical went wrong, likely auth-related
+        const isAuthError = status === 401 || status === 403;
+        const isCriticalError = status === 500;
+
+        if (isAuthError || isCriticalError) {
+          console.log(
+            `[API Client] ${
+              isCriticalError
+                ? "Critical server error (500)"
+                : "Authentication error"
+            } detected, logging out user`
+          );
+
           // Clear auth data
           localStorage.removeItem("token");
           localStorage.removeItem("userId");
@@ -69,9 +83,8 @@ class ApiClient {
 
           // Emit event to notify AuthContext
           authEventEmitter.emit();
-
-          // Return the error so the calling code can handle it
         }
+
         return Promise.reject(error);
       }
     );
