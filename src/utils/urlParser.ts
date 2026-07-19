@@ -67,6 +67,15 @@ export const parseUrlsInText = (text: string): TextPart[] => {
 };
 
 /**
+ * Return the first URL found in a message, if any -- used to decide
+ * whether to render a link preview card beneath the message
+ */
+export const extractFirstUrl = (text: string): string | null => {
+  const firstUrlPart = parseUrlsInText(text).find((part) => part.type === "url");
+  return firstUrlPart ? getHrefFromUrl(firstUrlPart.content) : null;
+};
+
+/**
  * Convert URL to clickable href
  */
 export const getHrefFromUrl = (url: string): string => {

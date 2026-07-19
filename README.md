@@ -1,19 +1,35 @@
 # BTC2 (web version)
 
-A modern React chat application built with Vite and Mantine, designed to work with the BTC2-API backend.
+A React chat application built with Vite and Mantine — direct messages, group chats, and link previews — designed to work with the [BTC2-API](https://github.com/beetron/btc2-api) backend.
 
-## Features
+## 📑 Table of Contents
 
-- ✨ **Authentication**: Login, Signup, Forgot Username, Forgot Password
-- 💬 **Real-time Messaging**: Send and receive messages with friends
-- 👥 **Friend Management**: Add, accept, and manage friend requests
-- 🌓 **Dark/Light Theme**: Toggle between dark and light modes
-- 📱 **Responsive Design**: Works on desktop and mobile devices
-- 🔐 **JWT Authentication**: Secure token-based authentication
+- [✨ Features](#-features)
+- [🛠️ Tech Stack](#️-tech-stack)
+- [🚀 Setup](#-setup)
+- [⚙️ Environment Configuration](#️-environment-configuration)
+- [🏗️ Project Structure](#️-project-structure)
+- [🔑 Authentication & Sessions](#-authentication--sessions)
+- [🔌 Real-time (Socket.IO)](#-real-time-socketio)
+- [🔗 Services](#-services)
 
-## Tech Stack
+## ✨ Features
 
-- **Frontend Framework**: React 18
+- **Unified chat list**: direct and group conversations in one list, with unread badges and last-activity time
+- **Group chat**: create groups, rename, manage members (add/remove/leave), role-aware UI (owner/admin/member)
+- **Add Friend from a group**: a non-friend group member can be sent a friend request right from the group settings modal
+- **Cursor-paginated messages**: older history loads as you scroll up, scroll position preserved
+- **Image messages**: attach and preview images in any conversation
+- **Link previews**: a small unfurl card (image/title/description) renders under any message containing a URL
+- **Friend management**: add, accept/reject requests, block/unblock, report
+- **Persistent sessions**: silent access-token refresh in the background — no forced re-login as long as the app is used at least once every 14 days
+- **Dark/Light theme** toggle
+- **Responsive design**: desktop and mobile
+- **Offline-friendly message cache** (IndexedDB) for instant paint on reopen
+
+## 🛠️ Tech Stack
+
+- **Frontend Framework**: React 19
 - **Build Tool**: Vite
 - **UI Library**: Mantine
 - **HTTP Client**: Axios
@@ -22,52 +38,35 @@ A modern React chat application built with Vite and Mantine, designed to work wi
 - **Real-time**: Socket.IO Client
 - **Language**: TypeScript
 
-## Prerequisites
+## 🚀 Setup
+
+### Prerequisites
 
 - Node.js 18+
-- npm or yarn
+- npm
 
-## Installation
+### Installation
 
 1. Clone the repository:
-
-```bash
-git clone <repository-url>
-cd btc2-web
-```
-
+   ```bash
+   git clone <repository-url>
+   cd btc2-web
+   ```
 2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Configure environment variables (see below).
 
-```bash
-npm install
-```
-
-3. Configure environment variables:
-
-```bash
-cp .env.local.example .env.local
-```
-
-Edit `.env.local` to match your backend API URLs:
-
-```
-VITE_API_URL_DEV=http://localhost:3000
-VITE_API_URL_PROD=https://api.com
-```
-
-## Development
-
-Run the development server:
+### Development
 
 ```bash
 npm run dev
 ```
 
-The application will be available at `http://localhost:5173`
+The application will be available at `http://localhost:5173`.
 
-## Building
-
-Build for production:
+### Building
 
 ```bash
 npm run build
@@ -75,77 +74,104 @@ npm run build
 
 The built files will be in the `dist/` directory.
 
-## Project Structure
+## ⚙️ Environment Configuration
+
+The API base URL comes from a single variable, `VITE_API_URL`, set per Vite mode:
+
+- `.env.development` — used by `npm run dev`
+  ```env
+  NODE_ENV=development
+  VITE_API_URL=http://localhost:3000
+  ```
+- `.env` — used by `npm run build` / production
+  ```env
+  VITE_API_URL=https://api.yourapp.com
+  ```
+
+`src/config.ts` reads this via `import.meta.env.VITE_API_URL`, falling back to `http://localhost:3000` if unset. The Socket.IO client derives its own connection URL from the same value.
+
+## 🏗️ Project Structure
 
 ```
 src/
-├── components/          # Reusable React components
-│   ├── FriendList.tsx
-│   ├── MessageInput.tsx
-│   ├── MessageList.tsx
-│   ├── ProtectedRoute.tsx
+├── components/
+│   ├── AuthHeader.tsx          # Header shown on login/signup/forgot-* pages
+│   ├── ConversationList.tsx    # Unified direct + group chat list
+│   ├── CreateGroupModal.tsx    # New group: name + friend multi-select
+│   ├── FriendSelectList.tsx    # Shared checkbox friend-picker (create group / add members)
+│   ├── GroupManageModal.tsx    # Rename, members, add-friend shortcut, leave group
+│   ├── Header.tsx              # Main app header/nav
+│   ├── ImagePreviewModal.tsx   # Preview before sending image attachments
+│   ├── LinkPreviewCard.tsx     # Unfurl card rendered under a message's URL
+│   ├── MessageInput.tsx        # Composer: text + image upload
+│   ├── MessageList.tsx         # Message thread: pagination, images, link previews
+│   ├── NewChatModal.tsx        # Start a direct chat with a friend
+│   ├── ProtectedRoute.tsx      # Route guard for authenticated pages
+│   ├── RootRedirect.tsx        # "/" -> /friends or /login
 │   └── ThemeToggle.tsx
-├── contexts/            # React contexts for state management
-│   └── AuthContext.tsx
-├── pages/               # Page components
-│   ├── ChatPage.tsx
+├── contexts/
+│   ├── AuthContext.tsx         # Source of truth for auth state + current user's profile
+│   └── SocketContext.tsx       # Socket lifecycle, tied to auth state
+├── hooks/
+│   ├── useMessageCache.ts
+│   ├── useProfileImageCache.ts
+│   └── useSocketListener.ts    # Subscribe to a socket event with auto cleanup
+├── pages/
+│   ├── EditFriendsPage.tsx
 │   ├── ForgotPasswordPage.tsx
 │   ├── ForgotUsernamePage.tsx
+│   ├── FriendListPage.tsx      # Route: /friends -- the chat list page
 │   ├── LoginPage.tsx
+│   ├── MessagesPage.tsx        # Route: /messages/:conversationId
+│   ├── SettingsPage.tsx        # Profile, email/password, delete account
 │   └── SignupPage.tsx
-├── router/              # Router configuration
+├── router/
 │   └── AppRouter.tsx
-├── services/            # API services
-│   ├── authService.ts
-│   ├── messageService.ts
-│   └── userService.ts
-├── config.ts            # Configuration (environment variables)
-├── App.tsx              # Main app component
-├── main.tsx             # Entry point
-└── index.css            # Global styles
+├── services/
+│   ├── apiClient.ts            # Shared axios instance: auth header, silent token refresh
+│   ├── authService.ts          # signup/login/logout, token storage
+│   ├── conversationService.ts  # /conversations API (direct + group chat)
+│   ├── linkPreviewService.ts   # /link-preview API, client-side response cache
+│   ├── messageCacheService.ts  # IndexedDB message cache
+│   ├── messageService.ts       # Legacy /messages "clear history" call
+│   ├── socketService.ts        # Socket.IO connection + event dispatch
+│   └── userService.ts          # /users API: profile, friends, blocking
+├── utils/
+│   ├── imageLoader.ts          # Authenticated image fetch -> data URL, cached per user
+│   ├── imageValidation.ts
+│   ├── profileImageUtils.ts
+│   └── urlParser.ts            # URL detection in message text (for links + previews)
+├── config.ts
+├── App.tsx                     # Provider tree: Mantine -> Auth -> Socket -> Router
+└── main.tsx
 ```
 
-## Environment Configuration
+## 🔑 Authentication & Sessions
 
-The application automatically switches between development and production based on `NODE_ENV`:
+- On login/signup, the API returns an **access token** (JWT, 7 days) and a **refresh token** (opaque, 14 days, sliding). Both are stored in `localStorage` alongside the user's cached profile fields (`nickname`, `uniqueId`, `email`, `userProfileImage`) — the tokens are the only things that actually need persisting; the profile fields are just an instant-paint hint.
+- **`AuthContext`** is the single source of truth for the current user's profile during a session. On mount it paints from the cached hint, then fetches `GET /users/me` in the background and corrects anything stale. Settings-page edits (nickname/uniqueId/email/profile image) go through context methods that update both the in-memory state and the cache — nothing else should read these fields from `localStorage` directly.
+- **Silent refresh**: `apiClient`'s response interceptor catches a `401`, calls `POST /auth/refresh` once, retries the original request with the new access token, and only falls back to logging the user out if the refresh itself fails. Concurrent `401`s share a single in-flight refresh instead of each firing their own request.
+- **Multi-tab safe**: refresh tokens rotate on every use (one-time use), so two tabs racing a refresh at the same moment could otherwise cause the "losing" tab to wipe out the "winning" tab's freshly-issued tokens. If a refresh call fails, `apiClient` rechecks `localStorage` a moment later — if a sibling tab already rotated in a valid new token, it's used instead of logging out.
+- Logout sends the refresh token to `POST /auth/logout` so the server revokes it immediately, rather than just discarding it client-side.
 
-- **Development**: Uses `VITE_API_URL_DEV` (default: http://localhost:3000)
-- **Production**: Uses `VITE_API_URL_PROD` (default: https://api.com)
+## 🔌 Real-time (Socket.IO)
 
-## API Integration
+- `socketService` connects with the access token as `auth: { token }` — no query-string identity is sent.
+- Listened-for events (see `useSocketListener`): `conversation:message`, `conversation:memberAdded`, `conversation:memberRemoved`, `conversation:updated`, plus the legacy `newMessageSignal`.
+- If the handshake is rejected with `"Unauthorized"` (the API's `SOCKET_REQUIRE_AUTH` flag), the client attempts a silent token refresh and updates the socket's `auth` payload so Socket.IO's own reconnection logic retries with the fresh token — it only logs out if the refresh itself fails. This means the app is ready for the API to enforce `SOCKET_REQUIRE_AUTH=true` with no frontend changes required.
 
-The application is designed to work with the BTC2-API backend. All endpoints are supported:
+## 🔗 Services
 
-### Authentication
+Each service wraps one area of the API — see [btc2-api's README](https://github.com/beetron/btc2-api#-api-reference) for the exact endpoint list.
 
-- POST `/auth/signup` - Create new account
-- POST `/auth/login` - Login user
-- POST `/auth/logout` - Logout user
-- GET `/auth/forgotusername` - Request username
-- GET `/auth/forgotpassword` - Request password reset
-
-### Users
-
-- GET `/users/profileImage/:filename` - Get profile image
-- GET `/users/friendlist` - Get friend list
-- GET `/users/friendrequests` - Get friend requests
-- PUT `/users/addfriend/:uniqueId` - Send friend request
-- PUT `/users/acceptfriend/:uniqueId` - Accept friend request
-- PUT `/users/rejectfriend/:uniqueId` - Reject friend request
-- PUT `/users/removefriend/:uniqueId` - Remove friend
-- PUT `/users/changepassword` - Change password
-- PUT `/users/updatenickname/:nickname` - Update nickname
-- PUT `/users/updateuniqueid/:uniqueId` - Update unique ID
-- PUT `/users/updateprofileimage/` - Update profile image
-- PUT `/users/updateemail` - Update email
-- PUT `/users/fcm/register` - Register FCM token
-- DELETE `/users/fcm/token` - Delete FCM token
-
-### Messages
-
-- POST `/messages/send/:id` - Send message
-- GET `/messages/get/:id` - Get conversation history
-- DELETE `/messages/delete/:id` - Delete messages
+| Service | Wraps |
+|---|---|
+| `authService` | `/auth/*` — signup, login, logout, token storage |
+| `userService` | `/users/*` — own profile, friends, block/report |
+| `conversationService` | `/conversations/*` — direct + group chat, messages, membership |
+| `linkPreviewService` | `/link-preview/*` — URL unfurl metadata, with an in-memory de-dupe cache |
+| `messageService` | Legacy `/messages/delete/:id` (clear history) |
+| `socketService` | Socket.IO connection lifecycle and event dispatch |
 
 ## License
 

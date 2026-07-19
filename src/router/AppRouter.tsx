@@ -39,7 +39,7 @@ export const AppRouter: React.FC = () => {
           }
         />
         <Route
-          path="/messages/:friendId"
+          path="/messages/:conversationId"
           element={
             <ProtectedRoute>
               <MessagesPage />

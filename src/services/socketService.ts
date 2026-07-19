@@ -7,6 +7,7 @@
 import { Socket, io } from "socket.io-client";
 import { CONFIG } from "../config";
 import { authService } from "./authService";
+import { authEventEmitter, attemptTokenRefresh } from "./apiClient";
 
 interface EventListener {
   event: string;
@@ -46,11 +47,11 @@ class SocketService {
       const socketUrlObj = new URL(CONFIG.socketUrl);
       const socketBaseUrl = `${socketUrlObj.protocol}//${socketUrlObj.host}`;
 
+      // Identity comes solely from the JWT in the auth payload -- the legacy
+      // userId query param is no longer sent, matching the API's upcoming
+      // SOCKET_REQUIRE_AUTH=true enforcement.
       this.socket = io(socketBaseUrl, {
         path: CONFIG.isDevelopment ? "/socket.io" : "/btc-api/socket.io",
-        query: {
-          userId: userId,
-        },
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
@@ -91,8 +92,26 @@ class SocketService {
       this.notifyConnectionChange(false);
     });
 
-    this.socket.on("connect_error", (error) => {
+    this.socket.on("connect_error", async (error) => {
       console.error("Socket connection error:", error);
+      // The server rejects the handshake with "Unauthorized" when
+      // SOCKET_REQUIRE_AUTH is enabled and the access token is
+      // missing/expired. Try a silent refresh before giving up -- on
+      // success, just update the auth payload; socket.io's own
+      // reconnection loop will pick up the new token on its next
+      // automatic attempt. Only log out if refresh also fails.
+      if (error?.message === "Unauthorized") {
+        console.warn("Socket handshake unauthorized - attempting token refresh");
+        const refreshed = await attemptTokenRefresh();
+        if (refreshed && this.socket) {
+          this.socket.auth = { token: authService.getToken() };
+          console.log("Token refreshed - socket will retry with new token");
+        } else {
+          console.warn("Token refresh failed - logging out");
+          this.disconnect();
+          authEventEmitter.emit();
+        }
+      }
     });
 
     this.socket.on("reconnect_attempt", () => {

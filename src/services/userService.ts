@@ -23,7 +23,31 @@ interface Friend {
   updatedAt?: string;
 }
 
+export interface CurrentUser {
+  _id: string;
+  username: string;
+  nickname: string;
+  uniqueId: string;
+  email: string;
+  profileImage?: string;
+}
+
 class UserService {
+  /**
+   * Get the current (authenticated) user's own profile -- source of truth
+   * for rehydrating auth state on page load, since localStorage only
+   * persists the tokens, not profile fields.
+   */
+  async getCurrentUser(): Promise<CurrentUser> {
+    try {
+      const api = apiClient.getAxiosInstance();
+      const response = await api.get<CurrentUser>("/users/me");
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
   /**
    * Get profile image
    */

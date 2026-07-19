@@ -6,7 +6,7 @@ import { Button, Group, Textarea } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconSend, IconPaperclip } from "@tabler/icons-react";
 import { useState, useRef, useEffect } from "react";
-import { messageService } from "../services/messageService";
+import { conversationService } from "../services/conversationService";
 import { ImagePreviewModal } from "./ImagePreviewModal";
 import {
   validateImageFiles,
@@ -14,13 +14,13 @@ import {
 } from "../utils/imageValidation";
 
 interface MessageInputProps {
-  friendId: string;
+  conversationId: string;
   onMessageSent?: () => void;
   onInputResize?: () => void;
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
-  friendId,
+  conversationId,
   onMessageSent,
   onInputResize,
 }) => {
@@ -61,7 +61,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
     setIsLoading(true);
     try {
-      await messageService.sendMessage(friendId, { message });
+      await conversationService.sendMessage(conversationId, message);
       setMessage("");
       // Reset textarea height after sending
       if (textareaRef.current) {
@@ -125,7 +125,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
     setIsUploadingImages(true);
     try {
-      const result = await messageService.uploadImages(friendId, selectedFiles);
+      const result = await conversationService.uploadImages(
+        conversationId,
+        selectedFiles,
+      );
       if (result.success) {
         notifications.show({
           title: "Success",

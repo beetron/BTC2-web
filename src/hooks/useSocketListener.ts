@@ -9,7 +9,7 @@ import { Socket } from "socket.io-client";
 
 interface UseSocketListenerOptions {
   eventName: string;
-  onEvent: () => Promise<void> | void;
+  onEvent: (...args: any[]) => Promise<void> | void;
   enabled?: boolean;
 }
 
@@ -38,10 +38,10 @@ export const useSocketListener = (
       return;
     }
 
-    const handleEvent = async () => {
+    const handleEvent = async (...args: any[]) => {
       console.log(`Socket event received: ${eventName}`);
       try {
-        await onEvent();
+        await onEvent(...args);
       } catch (error) {
         console.error(`Error handling socket event ${eventName}:`, error);
       }
