@@ -15,11 +15,14 @@ interface CachedMessage {
   updatedAt?: string;
   readAt?: string;
   cachedAt?: number;
-  friendId?: string;
+  conversationId?: string;
 }
 
 const DB_NAME_PREFIX = "BTC2ChatCache";
-const DB_VERSION = 2;
+// v3: messages are keyed by conversationId (was friendId before the group
+// chat update). The version bump recreates the store, purging stale
+// friend-keyed entries.
+const DB_VERSION = 3;
 const MESSAGES_STORE = "messages";
 const METADATA_STORE = "metadata";
 
@@ -52,7 +55,7 @@ class MessageCacheService {
    */
   async clearUserCache(userId: string): Promise<void> {
     const dbName = this.getUserDBName(userId);
-    
+
     // Close current connection if it's for this user
     if (this.currentUserId === userId && this.db) {
       this.db.close();
@@ -63,14 +66,17 @@ class MessageCacheService {
     // Delete the user's database
     return new Promise<void>((resolve, reject) => {
       const deleteRequest = indexedDB.deleteDatabase(dbName);
-      
+
       deleteRequest.onsuccess = () => {
         console.log(`✓ Cleared all cache for user ${userId}`);
         resolve();
       };
-      
+
       deleteRequest.onerror = () => {
-        console.error(`Failed to clear cache for user ${userId}:`, deleteRequest.error);
+        console.error(
+          `Failed to clear cache for user ${userId}:`,
+          deleteRequest.error,
+        );
         reject(deleteRequest.error);
       };
     });
@@ -110,7 +116,7 @@ class MessageCacheService {
         const messagesStore = db.createObjectStore(MESSAGES_STORE, {
           keyPath: "_id",
         });
-        messagesStore.createIndex("friendId", "friendId", { unique: false });
+        messagesStore.createIndex("conversationId", "conversationId", { unique: false });
         messagesStore.createIndex("createdAt", "createdAt", { unique: false });
         console.log("✓ Created messages object store");
 
@@ -138,76 +144,58 @@ class MessageCacheService {
   }
 
   async cacheMessages(
-    friendId: string,
-    messages: CachedMessage[]
+    conversationId: string,
+    messages: CachedMessage[],
   ): Promise<void> {
+    if (messages.length === 0) return;
+
     const db = await this.ensureDB();
-    const transaction = db.transaction(
-      [MESSAGES_STORE, METADATA_STORE],
-      "readwrite"
-    );
-    const messagesStore = transaction.objectStore(MESSAGES_STORE);
-    const metadataStore = transaction.objectStore(METADATA_STORE);
 
-    let newMessagesCount = 0;
-
-    for (const message of messages) {
-      const existingMessage = await new Promise<CachedMessage | undefined>(
-        (resolve) => {
-          const request = messagesStore.get(message._id);
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => resolve(undefined);
-        }
+    return new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(
+        [MESSAGES_STORE, METADATA_STORE],
+        "readwrite",
       );
+      const messagesStore = transaction.objectStore(MESSAGES_STORE);
+      const metadataStore = transaction.objectStore(METADATA_STORE);
 
-      if (!existingMessage) {
-        const cachedMessage: CachedMessage = {
+      // Fire all puts in one transaction without awaiting each individually.
+      // Using put (upsert) eliminates the per-message existence check.
+      for (const message of messages) {
+        messagesStore.put({
           ...message,
-          friendId,
+          conversationId,
           cachedAt: message.cachedAt ?? Date.now(),
-        };
-
-        await new Promise<void>((resolve) => {
-          const request = messagesStore.add(cachedMessage);
-          request.onsuccess = () => {
-            newMessagesCount++;
-            resolve();
-          };
-          request.onerror = () => resolve();
         });
       }
-    }
 
-    await new Promise<void>((resolve) => {
-      const request = metadataStore.put({
-        key: `lastSync_${friendId}`,
-        value: Date.now(),
-      });
-      request.onsuccess = () => resolve();
-      request.onerror = () => resolve();
+      metadataStore.put({ key: `lastSync_${conversationId}`, value: Date.now() });
+
+      transaction.oncomplete = () => {
+        console.log(
+          `✓ Cached ${messages.length} messages for conversation ${conversationId}`,
+        );
+        resolve();
+      };
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
     });
-
-    if (newMessagesCount > 0) {
-      console.log(
-        `✓ Cached ${newMessagesCount} new messages for friend ${friendId}`
-      );
-    }
   }
 
-  async getCachedMessages(friendId: string): Promise<CachedMessage[]> {
+  async getCachedMessages(conversationId: string): Promise<CachedMessage[]> {
     const db = await this.ensureDB();
     const transaction = db.transaction([MESSAGES_STORE], "readonly");
     const messagesStore = transaction.objectStore(MESSAGES_STORE);
-    const index = messagesStore.index("friendId");
+    const index = messagesStore.index("conversationId");
 
     try {
       const messages = await new Promise<CachedMessage[]>((resolve) => {
-        const request = index.getAll(friendId);
+        const request = index.getAll(conversationId);
         request.onsuccess = () => {
           const results = (request.result || []) as CachedMessage[];
           results.sort(
             (a, b) =>
-              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
           );
           resolve(results);
         };
@@ -222,42 +210,42 @@ class MessageCacheService {
   }
 
   async getDeltaMessages(
-    friendId: string,
-    apiMessages: CachedMessage[]
+    conversationId: string,
+    apiMessages: CachedMessage[],
   ): Promise<CachedMessage[]> {
-    const cachedMessages = await this.getCachedMessages(friendId);
+    const cachedMessages = await this.getCachedMessages(conversationId);
     const cachedIds = new Set(cachedMessages.map((m) => m._id));
 
     const newMessages = apiMessages.filter((msg) => !cachedIds.has(msg._id));
 
     console.log(
-      `→ Found ${newMessages.length} new messages for friend ${friendId}`
+      `→ Found ${newMessages.length} new messages for conversation ${conversationId}`,
     );
     return newMessages;
   }
 
   async getMergedMessages(
-    friendId: string,
-    apiMessages: CachedMessage[]
+    conversationId: string,
+    apiMessages: CachedMessage[],
   ): Promise<CachedMessage[]> {
-    const newMessages = await this.getDeltaMessages(friendId, apiMessages);
+    const newMessages = await this.getDeltaMessages(conversationId, apiMessages);
 
     if (newMessages.length > 0) {
-      await this.cacheMessages(friendId, newMessages);
+      await this.cacheMessages(conversationId, newMessages);
     }
 
-    return this.getCachedMessages(friendId);
+    return this.getCachedMessages(conversationId);
   }
 
-  async clearConversationCache(friendId: string): Promise<void> {
+  async clearConversationCache(conversationId: string): Promise<void> {
     const db = await this.ensureDB();
     const transaction = db.transaction([MESSAGES_STORE], "readwrite");
     const messagesStore = transaction.objectStore(MESSAGES_STORE);
-    const index = messagesStore.index("friendId");
+    const index = messagesStore.index("conversationId");
 
     try {
       const keysToDelete = await new Promise<string[]>((resolve) => {
-        const request = index.getAllKeys(friendId);
+        const request = index.getAllKeys(conversationId);
         request.onsuccess = () => resolve((request.result || []) as string[]);
         request.onerror = () => resolve([]);
       });
@@ -270,7 +258,7 @@ class MessageCacheService {
         });
       }
 
-      console.log(`✓ Cleared cache for friend ${friendId}`);
+      console.log(`✓ Cleared cache for conversation ${conversationId}`);
     } catch (error) {
       console.error("Error clearing conversation cache:", error);
     }
@@ -282,7 +270,7 @@ class MessageCacheService {
       console.warn("No user ID available for cache clearing");
       return;
     }
-    
+
     await this.clearUserCache(userId);
   }
 

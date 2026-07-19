@@ -21,6 +21,7 @@ interface LoginRequest {
 interface AuthResponse {
   message: string;
   token: string;
+  refreshToken: string;
   userId?: string;
   _id?: string;
   username: string;
@@ -50,6 +51,9 @@ class AuthService {
       const response = await this.api.post<AuthResponse>("/auth/signup", data);
       if (response.data.token) {
         localStorage.setItem("token", response.data.token);
+        if (response.data.refreshToken) {
+          localStorage.setItem("refreshToken", response.data.refreshToken);
+        }
         const userId = response.data.userId || response.data._id;
         if (userId) {
           localStorage.setItem("userId", userId);
@@ -84,6 +88,9 @@ class AuthService {
       const response = await this.api.post<AuthResponse>("/auth/login", data);
       if (response.data.token) {
         localStorage.setItem("token", response.data.token);
+        if (response.data.refreshToken) {
+          localStorage.setItem("refreshToken", response.data.refreshToken);
+        }
         const userId = response.data.userId || response.data._id;
         if (userId) {
           localStorage.setItem("userId", userId);
@@ -112,30 +119,35 @@ class AuthService {
 
   /**
    * Logout user
+   * Clears local storage immediately and notifies the server in the background.
    */
-  async logout(): Promise<void> {
-    try {
-      const token = localStorage.getItem("token");
-      if (token) {
-        this.api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-        await this.api.post("/auth/logout");
-      }
-      localStorage.removeItem("token");
-      localStorage.removeItem("userId");
-      localStorage.removeItem("username");
-      localStorage.removeItem("userProfileImage");
-      localStorage.removeItem("nickname");
-      localStorage.removeItem("uniqueId");
-      localStorage.removeItem("email");
-    } catch (error) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("userId");
-      localStorage.removeItem("username");
-      localStorage.removeItem("userProfileImage");
-      localStorage.removeItem("nickname");
-      localStorage.removeItem("uniqueId");
-      localStorage.removeItem("email");
-      throw this.handleError(error);
+  logout(): void {
+    const token = localStorage.getItem("token");
+    const refreshToken = localStorage.getItem("refreshToken");
+
+    // Clear local state immediately so the UI can respond without waiting
+    localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("username");
+    localStorage.removeItem("userProfileImage");
+    localStorage.removeItem("nickname");
+    localStorage.removeItem("uniqueId");
+    localStorage.removeItem("email");
+
+    // Notify the server fire-and-forget — failure is acceptable here.
+    // Sending the refresh token lets the server revoke it immediately
+    // instead of leaving it valid until its own expiry.
+    if (token || refreshToken) {
+      this.api
+        .post(
+          "/auth/logout",
+          { refreshToken },
+          token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+        )
+        .catch(() => {
+          // Ignore — local logout already completed
+        });
     }
   }
 
@@ -143,7 +155,7 @@ class AuthService {
    * Forgot username - request username reset
    */
   async forgotUsername(
-    data: ForgotUsernameRequest
+    data: ForgotUsernameRequest,
   ): Promise<{ message: string }> {
     try {
       const response = await this.api.post("/auth/forgotusername", data);
@@ -157,7 +169,7 @@ class AuthService {
    * Forgot password - request password reset
    */
   async forgotPassword(
-    data: ForgotPasswordRequest
+    data: ForgotPasswordRequest,
   ): Promise<{ message: string }> {
     try {
       const response = await this.api.post("/auth/forgotpassword", data);
@@ -177,8 +189,8 @@ class AuthService {
     }
     try {
       await this.api.delete(`/auth/deleteaccount/${userId}`);
-      // After successful deletion, logout to clear local storage
-      await this.logout();
+      // After successful deletion, clear local auth state
+      this.logout();
     } catch (error) {
       throw this.handleError(error);
     }

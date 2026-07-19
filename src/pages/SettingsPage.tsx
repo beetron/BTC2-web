@@ -95,10 +95,20 @@ const validatePassword = (password: string): string | null => {
 
 export const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { deleteAccount } = useAuth();
+  const {
+    deleteAccount,
+    username,
+    nickname: contextNickname,
+    uniqueId: contextUniqueId,
+    email: contextEmail,
+    userProfileImage: contextProfileImage,
+    updateNickname: updateNicknameInContext,
+    updateUniqueId: updateUniqueIdInContext,
+    updateEmail: updateEmailInContext,
+    updateProfileImage: updateProfileImageInContext,
+  } = useAuth();
   const [nickname, setNickname] = useState("");
   const [uniqueId, setUniqueId] = useState("");
-  const [username, setUsername] = useState("");
   const [currentEmail, setCurrentEmail] = useState("");
   const [email, setEmail] = useState("");
   const [emailChangePassword, setEmailChangePassword] = useState("");
@@ -116,24 +126,20 @@ export const SettingsPage: React.FC = () => {
   const [isLoadingCurrentImage, setIsLoadingCurrentImage] = useState(true);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
+  // Seed the editable fields from AuthContext -- the source of truth for
+  // profile data. Re-runs if context values change (e.g. once the
+  // background GET /users/me fetch resolves with fresher data).
   useEffect(() => {
-    // Load user info from local storage on mount
-    const storedUsername = localStorage.getItem("username");
-    const storedNickname = localStorage.getItem("nickname");
-    const storedUniqueId = localStorage.getItem("uniqueId");
-    const storedEmail = localStorage.getItem("email");
-    const storedProfileImage = localStorage.getItem("userProfileImage");
+    if (contextNickname) setNickname(contextNickname);
+    if (contextUniqueId) setUniqueId(contextUniqueId);
+    if (contextEmail) setCurrentEmail(contextEmail);
+  }, [contextNickname, contextUniqueId, contextEmail]);
 
-    if (storedUsername) setUsername(storedUsername);
-    if (storedNickname) setNickname(storedNickname);
-    if (storedUniqueId) setUniqueId(storedUniqueId);
-    if (storedEmail) {
-      setCurrentEmail(storedEmail);
-    }
-
+  useEffect(() => {
     // Load current profile image
-    if (storedProfileImage) {
-      getProfileImageUrl(storedProfileImage)
+    if (contextProfileImage) {
+      setIsLoadingCurrentImage(true);
+      getProfileImageUrl(contextProfileImage)
         .then((imageUrl) => {
           if (imageUrl) {
             setCurrentProfileImage(imageUrl);
@@ -148,7 +154,7 @@ export const SettingsPage: React.FC = () => {
     } else {
       setIsLoadingCurrentImage(false);
     }
-  }, []);
+  }, [contextProfileImage]);
   const handleUpdateNickname = async () => {
     const validationError = validateNickname(nickname);
     if (validationError) {
@@ -162,8 +168,7 @@ export const SettingsPage: React.FC = () => {
 
     setIsLoading(true);
     try {
-      await userService.updateNickname(nickname.trim());
-      localStorage.setItem("nickname", nickname.trim());
+      await updateNicknameInContext(nickname.trim());
       notifications.show({
         title: "Success",
         message: "Nickname updated successfully",
@@ -195,8 +200,7 @@ export const SettingsPage: React.FC = () => {
 
     setIsLoading(true);
     try {
-      await userService.updateUniqueId(uniqueId.trim());
-      localStorage.setItem("uniqueId", uniqueId.trim());
+      await updateUniqueIdInContext(uniqueId.trim());
       notifications.show({
         title: "Success",
         message: "Unique ID updated successfully",
@@ -237,9 +241,8 @@ export const SettingsPage: React.FC = () => {
 
     setIsLoading(true);
     try {
-      await userService.updateEmail(email.trim(), emailChangePassword);
       const trimmedEmail = email.trim();
-      localStorage.setItem("email", trimmedEmail);
+      await updateEmailInContext(trimmedEmail, emailChangePassword);
       setCurrentEmail(trimmedEmail);
       setEmail("");
       setEmailChangePassword("");
@@ -347,20 +350,9 @@ export const SettingsPage: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const response = await userService.updateProfileImage(profileImageFile);
-
-      // Update localStorage with new profile image filename
-      if (response.profileImage) {
-        localStorage.setItem("userProfileImage", response.profileImage);
-
-        // Reload the current image preview
-        setIsLoadingCurrentImage(true);
-        const imageUrl = await getProfileImageUrl(response.profileImage);
-        if (imageUrl) {
-          setCurrentProfileImage(imageUrl);
-        }
-        setIsLoadingCurrentImage(false);
-      }
+      // Updates AuthContext's profileImage, which the effect above picks
+      // up to refresh the preview -- no need to duplicate that here.
+      await updateProfileImageInContext(profileImageFile);
 
       setProfileImageFile(null);
       setSelectedImagePreview(null);

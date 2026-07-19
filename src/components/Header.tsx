@@ -32,28 +32,19 @@ export const Header: React.FC<HeaderProps> = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate("/login");
-      notifications.show({
-        title: "Success",
-        message: "Logged out successfully",
-        color: "green",
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Logout failed";
-      notifications.show({
-        title: "Error",
-        message,
-        color: "red",
-      });
-    }
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+    notifications.show({
+      title: "Success",
+      message: "Logged out successfully",
+      color: "green",
+    });
   };
 
   const menuItems = [
     {
-      label: "Friends",
+      label: "Chats",
       icon: IconUsers,
       onClick: () => {
         navigate("/friends");
