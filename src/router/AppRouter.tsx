@@ -18,6 +18,20 @@ import { ForgotUsernamePage } from "../pages/ForgotUsernamePage";
 import { ForgotPasswordPage } from "../pages/ForgotPasswordPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { EditFriendsPage } from "../pages/EditFriendsPage";
+import { AdminRoute } from "../components/AdminRoute";
+import { lazy, Suspense } from "react";
+import { Center, Loader } from "@mantine/core";
+
+// Admin pages are split into their own chunk, so regular users never
+// download them
+const AdminUsersPage = lazy(() => import("../pages/admin/AdminUsersPage"));
+const AdminUserPage = lazy(() => import("../pages/admin/AdminUserPage"));
+
+const PageLoader = () => (
+  <Center py={80}>
+    <Loader />
+  </Center>
+);
 
 export const AppRouter: React.FC = () => {
   return (
@@ -60,6 +74,28 @@ export const AppRouter: React.FC = () => {
             <ProtectedRoute>
               <EditFriendsPage />
             </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Routes */}
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <Suspense fallback={<PageLoader />}>
+                <AdminUsersPage />
+              </Suspense>
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/users/:userId"
+          element={
+            <AdminRoute>
+              <Suspense fallback={<PageLoader />}>
+                <AdminUserPage />
+              </Suspense>
+            </AdminRoute>
           }
         />
 

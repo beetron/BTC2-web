@@ -30,6 +30,7 @@ export interface CurrentUser {
   uniqueId: string;
   email: string;
   profileImage?: string;
+  isAdmin?: boolean;
 }
 
 class UserService {
