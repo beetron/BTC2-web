@@ -19,6 +19,7 @@ import {
   IconEdit,
   IconSettings,
   IconLogout,
+  IconShieldLock,
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -30,7 +31,7 @@ interface HeaderProps {}
 export const Header: React.FC<HeaderProps> = () => {
   const [opened, { toggle, close }] = useDisclosure(false);
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, isAdmin } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -67,6 +68,18 @@ export const Header: React.FC<HeaderProps> = () => {
         close();
       },
     },
+    ...(isAdmin
+      ? [
+          {
+            label: "Admin",
+            icon: IconShieldLock,
+            onClick: () => {
+              navigate("/admin");
+              close();
+            },
+          },
+        ]
+      : []),
   ];
 
   return (

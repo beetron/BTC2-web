@@ -11,12 +11,13 @@ A React chat application built with Vite and Mantine — direct messages, group 
 - [🏗️ Project Structure](#️-project-structure)
 - [🔑 Authentication & Sessions](#-authentication--sessions)
 - [🔌 Real-time (Socket.IO)](#-real-time-socketio)
+- [🛡️ Admin](#️-admin)
 - [🔗 Services](#-services)
 
 ## ✨ Features
 
 - **Unified chat list**: direct and group conversations in one list, with unread badges and last-activity time
-- **Group chat**: create groups, rename, manage members (add/remove/leave), role-aware UI (owner/admin/member)
+- **Group chat**: create groups, rename, manage members (add/remove/leave), role-aware UI (owner/member)
 - **Add Friend from a group**: a non-friend group member can be sent a friend request right from the group settings modal
 - **Cursor-paginated messages**: older history loads as you scroll up, scroll position preserved
 - **Image messages**: attach and preview images in any conversation
@@ -25,7 +26,8 @@ A React chat application built with Vite and Mantine — direct messages, group 
 - **Persistent sessions**: silent access-token refresh in the background — no forced re-login as long as the app is used at least once every 14 days
 - **Dark/Light theme** toggle
 - **Responsive design**: desktop and mobile
-- **Offline-friendly message cache** (IndexedDB) for instant paint on reopen
+- **Offline-friendly message cache** (IndexedDB) for instant paint on reopen; messages deleted on the server are dropped from open chats and the cache on the next sync
+- **Admin area** (`/admin`, admin account only): search and list users, add a user directly (they start out as the admin's friend), edit username/email/unique ID/password, delete everything a user sent, delete a user. See [Admin](#️-admin).
 
 ## 🛠️ Tech Stack
 
@@ -42,7 +44,7 @@ A React chat application built with Vite and Mantine — direct messages, group 
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20.19+ or 22.12+ (required by Vite 7)
 - npm
 
 ### Installation
@@ -95,6 +97,7 @@ The API base URL comes from a single variable, `VITE_API_URL`, set per Vite mode
 ```
 src/
 ├── components/
+│   ├── AdminRoute.tsx          # Route guard for /admin pages (asks /users/me before rendering)
 │   ├── AuthHeader.tsx          # Header shown on login/signup/forgot-* pages
 │   ├── ConversationList.tsx    # Unified direct + group chat list
 │   ├── CreateGroupModal.tsx    # New group: name + friend multi-select
@@ -117,6 +120,10 @@ src/
 │   ├── useProfileImageCache.ts
 │   └── useSocketListener.ts    # Subscribe to a socket event with auto cleanup
 ├── pages/
+│   ├── admin/
+│   │   ├── AddUserModal.tsx    # Create a user directly (with password generator)
+│   │   ├── AdminUserPage.tsx   # Route: /admin/users/:userId -- edit, delete messages, delete user
+│   │   └── AdminUsersPage.tsx  # Route: /admin -- searchable, paginated user list
 │   ├── EditFriendsPage.tsx
 │   ├── ForgotPasswordPage.tsx
 │   ├── ForgotUsernamePage.tsx
@@ -128,6 +135,7 @@ src/
 ├── router/
 │   └── AppRouter.tsx
 ├── services/
+│   ├── adminService.ts         # /admin API: list, create, edit, delete users
 │   ├── apiClient.ts            # Shared axios instance: auth header, silent token refresh
 │   ├── authService.ts          # signup/login/logout, token storage
 │   ├── conversationService.ts  # /conversations API (direct + group chat)
@@ -139,6 +147,7 @@ src/
 ├── utils/
 │   ├── imageLoader.ts          # Authenticated image fetch -> data URL, cached per user
 │   ├── imageValidation.ts
+│   ├── messageSync.ts          # Finds local messages the server has deleted
 │   ├── profileImageUtils.ts
 │   └── urlParser.ts            # URL detection in message text (for links + previews)
 ├── config.ts
@@ -160,6 +169,16 @@ src/
 - Listened-for events (see `useSocketListener`): `conversation:message`, `conversation:memberAdded`, `conversation:memberRemoved`, `conversation:updated`, plus the legacy `newMessageSignal`.
 - If the handshake is rejected with `"Unauthorized"` (the API's `SOCKET_REQUIRE_AUTH` flag), the client attempts a silent token refresh and updates the socket's `auth` payload so Socket.IO's own reconnection logic retries with the fresh token — it only logs out if the refresh itself fails. This means the app is ready for the API to enforce `SOCKET_REQUIRE_AUTH=true` with no frontend changes required.
 
+## 🛡️ Admin
+
+The admin area is for the single account set as `ADMIN_USER_ID` on the API.
+
+- **Access**: `GET /users/me` returns `isAdmin`. `AuthContext` uses it to show the **Admin** link in the header, and `AdminRoute` checks it again before rendering any `/admin` page, sending everyone else to `/friends`. This only shapes the UI; the API refuses every `/admin` call from other accounts.
+- **Separate download**: the admin pages are lazy-loaded into their own chunks, so regular users never download them.
+- **`/admin`**: users A to Z, 50 per page with **Load more**, and a search box (prefix match on username, unique ID or email). **Add user** opens a form for username, password (with a **Generate password** button), and optional email, unique ID and nickname. A blank email becomes `<username>@users.invalid`, which never receives mail. The new user is added to the admin's friends.
+- **`/admin/users/:userId`**: message, group, friend and signed-in device counts; an edit form for username, unique ID, email and a new password (only changed fields are sent); **Delete all messages** (only what this user sent) and **Delete user**. Both deletes require typing the username to confirm.
+- Saving an edit signs that user out on every device, so they log in again with the new details. On the admin's own account that includes the admin, and **Delete user** is disabled there.
+
 ## 🔗 Services
 
 Each service wraps one area of the API — see [btc2-api's README](https://github.com/beetron/btc2-api#-api-reference) for the exact endpoint list.
@@ -171,6 +190,7 @@ Each service wraps one area of the API — see [btc2-api's README](https://githu
 | `conversationService` | `/conversations/*` — direct + group chat, messages, membership |
 | `linkPreviewService` | `/link-preview/*` — URL unfurl metadata, with an in-memory de-dupe cache |
 | `messageService` | Legacy `/messages/delete/:id` (clear history) |
+| `adminService` | `/admin/*`: list, create, edit and delete users (admin account only) |
 | `socketService` | Socket.IO connection lifecycle and event dispatch |
 
 ## License

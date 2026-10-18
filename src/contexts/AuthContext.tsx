@@ -31,6 +31,8 @@ interface AuthContextType extends Profile {
   isAuthenticated: boolean;
   isLoading: boolean;
   userId: string | null;
+  /** UI hint only (from GET /users/me) -- the API enforces admin access */
+  isAdmin: boolean;
   login: (username: string, password: string) => Promise<void>;
   signup: (
     username: string,
@@ -91,6 +93,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile>(emptyProfile);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Login and signup responses don't carry isAdmin, so ask /users/me once
+  // the session exists. Failure just leaves the admin area hidden.
+  const refreshAdminFlag = () => {
+    userService
+      .getCurrentUser()
+      .then((current) => setIsAdmin(current.isAdmin === true))
+      .catch(() => setIsAdmin(false));
+  };
 
   useEffect(() => {
     const token = authService.getToken();
@@ -115,6 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           };
           setProfile(fresh);
           writeCachedProfile(fresh);
+          setIsAdmin(current.isAdmin === true);
         })
         .catch((err) => {
           // A failed fetch here doesn't necessarily mean the session is
@@ -134,6 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsAuthenticated(false);
       setUserId(null);
       setProfile(emptyProfile);
+      setIsAdmin(false);
       setError("Your session has expired. Please login again.");
 
       if (currentUserId) {
@@ -187,6 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         email: response.email || null,
         userProfileImage: response.profileImage || null,
       });
+      refreshAdminFlag();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed";
       setError(message);
@@ -235,6 +250,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         email: response.email || null,
         userProfileImage: response.profileImage || null,
       });
+      refreshAdminFlag();
       return response; // Return the response so SignupPage can access success message
     } catch (err) {
       const message = err instanceof Error ? err.message : "Signup failed";
@@ -253,6 +269,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsAuthenticated(false);
     setUserId(null);
     setProfile(emptyProfile);
+    setIsAdmin(false);
 
     clearUserCaches(currentUserId);
   };
@@ -291,6 +308,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsAuthenticated(false);
       setUserId(null);
       setProfile(emptyProfile);
+      setIsAdmin(false);
 
       clearUserCaches(currentUserId);
     } catch (err) {
@@ -336,6 +354,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         isAuthenticated,
         isLoading,
         userId,
+        isAdmin,
         ...profile,
         login,
         signup,

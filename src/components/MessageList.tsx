@@ -26,6 +26,7 @@ import { useSocketListener } from "../hooks/useSocketListener";
 import { loadImageWithAuth } from "../utils/imageLoader";
 import { parseUrlsInText, getHrefFromUrl, extractFirstUrl } from "../utils/urlParser";
 import { LinkPreviewCard } from "./LinkPreviewCard";
+import { findDeletedMessageIds } from "../utils/messageSync";
 import { CONFIG } from "../config";
 
 export interface MemberDisplay {
@@ -138,11 +139,20 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
     const syncNewestPage = useCallback(async () => {
       const { messages: page, nextCursor: cursor } =
         await conversationService.getMessages(conversationId);
-      setMessages((current) => mergeMessages(current, page));
+      const hasOlder = cursor !== null;
+      setMessages((current) => {
+        // Drop anything the server deleted (e.g. an admin purge) before
+        // merging, so it disappears from an open chat without a reload
+        const deleted = new Set(findDeletedMessageIds(current, page, hasOlder));
+        const kept = deleted.size
+          ? current.filter((m) => !deleted.has(m._id))
+          : current;
+        return mergeMessages(kept, page);
+      });
       setNextCursor((current) => current ?? cursor);
       // Cache in the background — don't block the UI
       messageCacheService
-        .cacheMessages(conversationId, page as any)
+        .syncNewestPage(conversationId, page as any, hasOlder)
         .catch((error) => console.error("Background cache error:", error));
     }, [conversationId]);
 

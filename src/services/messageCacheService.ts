@@ -4,6 +4,8 @@
  * Simple delta sync: only new messages are cached and returned
  */
 
+import { findDeletedMessageIds } from "../utils/messageSync";
+
 interface CachedMessage {
   _id: string;
   senderId: string;
@@ -235,6 +237,36 @@ class MessageCacheService {
     }
 
     return this.getCachedMessages(conversationId);
+  }
+
+  /**
+   * Store the newest page and evict cached messages the server no longer
+   * has (see findDeletedMessageIds), so a reopened chat doesn't briefly
+   * show deleted messages from the cache.
+   */
+  async syncNewestPage(
+    conversationId: string,
+    newestPage: CachedMessage[],
+    hasOlder: boolean,
+  ): Promise<void> {
+    const cached = await this.getCachedMessages(conversationId);
+    const deletedIds = findDeletedMessageIds(cached, newestPage, hasOlder);
+
+    if (deletedIds.length > 0) {
+      const db = await this.ensureDB();
+      await new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction([MESSAGES_STORE], "readwrite");
+        const messagesStore = transaction.objectStore(MESSAGES_STORE);
+        for (const id of deletedIds) messagesStore.delete(id);
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+      });
+      console.log(
+        `✓ Removed ${deletedIds.length} deleted messages from cache for conversation ${conversationId}`,
+      );
+    }
+
+    await this.cacheMessages(conversationId, newestPage);
   }
 
   async clearConversationCache(conversationId: string): Promise<void> {
