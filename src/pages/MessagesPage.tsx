@@ -19,7 +19,11 @@ import { IconArrowLeft, IconTrash, IconSettings } from "@tabler/icons-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { notifications } from "@mantine/notifications";
 import { Header } from "../components/Header";
-import { MessageList, MemberDisplay } from "../components/MessageList";
+import {
+  MessageList,
+  MemberDisplay,
+  MessageListHandle,
+} from "../components/MessageList";
 import { MessageInput } from "../components/MessageInput";
 import { GroupManageModal } from "../components/GroupManageModal";
 import { useSocket } from "../contexts/SocketContext";
@@ -29,6 +33,7 @@ import { messageCacheService } from "../services/messageCacheService";
 import {
   conversationService,
   ConversationDetail,
+  ConversationMessage,
 } from "../services/conversationService";
 import { useSocketListener } from "../hooks/useSocketListener";
 import { getProfileImageUrl } from "../utils/profileImageUtils";
@@ -45,8 +50,21 @@ export const MessagesPage: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const messageListRef = useRef<MessageListHandle>(null);
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true);
+  // Reply and edit are exclusive: starting one ends the other
+  const [replyTarget, setReplyTarget] = useState<ConversationMessage | null>(
+    null,
+  );
+  const [editTarget, setEditTarget] = useState<ConversationMessage | null>(
+    null,
+  );
   const currentUserId = localStorage.getItem("userId") || "";
+
+  useEffect(() => {
+    setReplyTarget(null);
+    setEditTarget(null);
+  }, [conversationId]);
 
   // Load conversation detail (name, type, members) and resolve avatars
   const loadDetail = useCallback(async () => {
@@ -119,10 +137,30 @@ export const MessagesPage: React.FC = () => {
     },
   });
 
-  const handleMessageSent = useCallback(async () => {
-    // Trigger a refresh of the message list
-    setRefreshKey((prev) => prev + 1);
+  // Show our own new or edited message straight from the API response
+  const handleMessageStored = useCallback((message: ConversationMessage) => {
+    messageListRef.current?.upsertMessage(message);
   }, []);
+
+  const handleReply = useCallback((message: ConversationMessage) => {
+    setEditTarget(null);
+    setReplyTarget(message);
+  }, []);
+
+  const handleEdit = useCallback((message: ConversationMessage) => {
+    setReplyTarget(null);
+    setEditTarget(message);
+  }, []);
+
+  const handleMessageDeleted = useCallback((messageId: string) => {
+    setReplyTarget((current) => (current?._id === messageId ? null : current));
+    setEditTarget((current) => (current?._id === messageId ? null : current));
+  }, []);
+
+  const senderName = (senderId: string) =>
+    senderId === currentUserId
+      ? "yourself"
+      : memberMap[senderId]?.nickname || "Former member";
 
   // Scroll message list to bottom when input resizes - only if user is at bottom
   const handleInputResize = useCallback(() => {
@@ -164,6 +202,8 @@ export const MessagesPage: React.FC = () => {
       await messageService.deleteMessages(latestMessageId);
       await messageCacheService.clearConversationCache(conversationId!);
       setMessageCount(0);
+      setReplyTarget(null);
+      setEditTarget(null);
       setIsDeleteModalOpen(false);
       setRefreshKey((prev) => prev + 1);
       notifications.show({
@@ -262,6 +302,10 @@ export const MessagesPage: React.FC = () => {
             conversationType={detail.type}
             memberMap={memberMap}
             socket={socket}
+            handleRef={messageListRef}
+            onReply={handleReply}
+            onEdit={handleEdit}
+            onMessageDeleted={handleMessageDeleted}
             onScrollStateChange={setIsScrolledToBottom}
             onMessageCountChange={setMessageCount}
           />
@@ -269,7 +313,19 @@ export const MessagesPage: React.FC = () => {
           {/* Message Input - Stays at bottom */}
           <MessageInput
             conversationId={conversationId!}
-            onMessageSent={handleMessageSent}
+            replyTo={
+              replyTarget
+                ? {
+                    message: replyTarget,
+                    senderName: senderName(replyTarget.senderId),
+                  }
+                : null
+            }
+            editing={editTarget}
+            onCancelReply={() => setReplyTarget(null)}
+            onCancelEdit={() => setEditTarget(null)}
+            onMessageSent={handleMessageStored}
+            onMessageEdited={handleMessageStored}
             onInputResize={handleInputResize}
           />
         </Stack>

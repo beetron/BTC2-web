@@ -21,12 +21,13 @@ A React chat application built with Vite and Mantine — direct messages, group 
 - **Add Friend from a group**: a non-friend group member can be sent a friend request right from the group settings modal
 - **Cursor-paginated messages**: older history loads as you scroll up, scroll position preserved
 - **Image messages**: attach and preview images in any conversation
+- **Message actions** (right-click a message): **Reply** with a quote of the original, **Copy text**, and for your own messages **Edit** (the message then shows its edit time with an "edited" label, and keeps its place in the thread) and **Delete for everyone** (leaves a "This message was deleted" placeholder; every image in that message is deleted too)
 - **Link previews**: a small unfurl card (image/title/description) renders under any message containing a URL
 - **Friend management**: add, accept/reject requests, block/unblock, report
 - **Persistent sessions**: silent access-token refresh in the background — no forced re-login as long as the app is used at least once every 14 days
 - **Dark/Light theme** toggle
 - **Responsive design**: desktop and mobile
-- **Offline-friendly message cache** (IndexedDB) for instant paint on reopen; messages deleted on the server are dropped from open chats and the cache on the next sync
+- **Offline-friendly message cache** (IndexedDB) for instant paint on reopen. Edits and deletes reach open chats and the cache through the API's changes feed, including for messages older than the newest page; messages removed outright (an admin purge) are dropped on the next sync
 - **Admin area** (`/admin`, admin account only): search and list users, add a user directly (they start out as the admin's friend), edit username/email/unique ID/password, delete everything a user sent, delete a user. See [Admin](#️-admin).
 
 ## 🛠️ Tech Stack
@@ -106,8 +107,10 @@ src/
 │   ├── Header.tsx              # Main app header/nav
 │   ├── ImagePreviewModal.tsx   # Preview before sending image attachments
 │   ├── LinkPreviewCard.tsx     # Unfurl card rendered under a message's URL
-│   ├── MessageInput.tsx        # Composer: text + image upload
-│   ├── MessageList.tsx         # Message thread: pagination, images, link previews
+│   ├── MessageBubble.tsx       # One message: quote, text, link preview, images, "edited", deleted placeholder
+│   ├── MessageContextMenu.tsx  # Right-click menu: reply, copy, edit, delete for everyone
+│   ├── MessageInput.tsx        # Composer: text + image upload, reply and edit bars
+│   ├── MessageList.tsx         # Message thread: pagination, sync, changes feed, delete confirmation
 │   ├── NewChatModal.tsx        # Start a direct chat with a friend
 │   ├── ProtectedRoute.tsx      # Route guard for authenticated pages
 │   ├── RootRedirect.tsx        # "/" -> /friends or /login
@@ -147,7 +150,8 @@ src/
 ├── utils/
 │   ├── imageLoader.ts          # Authenticated image fetch -> data URL, cached per user
 │   ├── imageValidation.ts
-│   ├── messageSync.ts          # Finds local messages the server has deleted
+│   ├── clientMessageId.ts      # Per-send id so a retried send is never stored twice
+│   ├── messageSync.ts          # Applies changes-feed updates; finds messages the server removed
 │   ├── profileImageUtils.ts
 │   └── urlParser.ts            # URL detection in message text (for links + previews)
 ├── config.ts
@@ -166,8 +170,10 @@ src/
 ## 🔌 Real-time (Socket.IO)
 
 - `socketService` connects with the access token as `auth: { token }` — no query-string identity is sent.
-- Listened-for events (see `useSocketListener`): `conversation:message`, `conversation:memberAdded`, `conversation:memberRemoved`, `conversation:updated`, plus the legacy `newMessageSignal`.
-- If the handshake is rejected with `"Unauthorized"` (the API's `SOCKET_REQUIRE_AUTH` flag), the client attempts a silent token refresh and updates the socket's `auth` payload so Socket.IO's own reconnection logic retries with the fresh token — it only logs out if the refresh itself fails. This means the app is ready for the API to enforce `SOCKET_REQUIRE_AUTH=true` with no frontend changes required.
+- Listened-for events (see `useSocketListener`): `conversation:message`, `conversation:memberAdded`, `conversation:memberRemoved`, `conversation:updated`.
+- `conversation:message` carries an `action`. For `created` (or no action, as after an admin purge) the open chat refetches the newest page, which also marks it read; for every action it then reads the changes feed (`GET /conversations/:id/messages/changes`) from the cursor saved in IndexedDB. A socket reconnect runs both, to catch anything missed while offline.
+- Sending, uploading, editing and deleting send the tab's socket id as `X-Socket-Id`, so the API skips only this tab for the event and the user's other tabs and devices still update. The tab itself shows the message from the API response at once.
+- If the handshake is rejected with `"Unauthorized"` (missing, expired or revoked token), the client attempts a silent token refresh and updates the socket's `auth` payload so Socket.IO's own reconnection logic retries with the fresh token. It only logs out if the refresh itself fails.
 
 ## 🛡️ Admin
 

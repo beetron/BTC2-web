@@ -105,11 +105,6 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     eventName: "conversation:memberRemoved",
     onEvent: loadConversations,
   });
-  // Legacy signal still emitted for direct messages from older clients
-  useSocketListener(socket, {
-    eventName: "newMessageSignal",
-    onEvent: loadConversations,
-  });
 
   if (isLoading) {
     return (

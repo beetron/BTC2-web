@@ -9,10 +9,23 @@ import { findDeletedMessageIds } from "../utils/messageSync";
 interface CachedMessage {
   _id: string;
   senderId: string;
-  receiverId: string;
-  message: string;
+  receiverId?: string | null;
+  /** null once the message is deleted for everyone */
+  message: string | null;
   image?: string;
   imageFiles?: string[];
+  clientMessageId?: string | null;
+  replyToId?: string | null;
+  replyTo?: {
+    _id: string;
+    senderId: string | null;
+    message: string | null;
+    hasImages: boolean;
+    deleted: boolean;
+    unavailable: boolean;
+  };
+  editedAt?: string | null;
+  deletedAt?: string | null;
   createdAt: string;
   updatedAt?: string;
   readAt?: string;
@@ -20,11 +33,23 @@ interface CachedMessage {
   conversationId?: string;
 }
 
+/**
+ * Where the next changes-feed request for a conversation starts: the
+ * cursor the API returned last time, or a server timestamp before the
+ * first request.
+ */
+export interface ChangesPosition {
+  cursor?: string;
+  since?: string;
+}
+
 const DB_NAME_PREFIX = "BTC2ChatCache";
 // v3: messages are keyed by conversationId (was friendId before the group
-// chat update). The version bump recreates the store, purging stale
-// friend-keyed entries.
-const DB_VERSION = 3;
+// chat update).
+// v4: messages carry replyTo, editedAt and deletedAt, and the changes-feed
+// position lives in the metadata store. Caches written before v4 may hold
+// stale copies of edited or deleted messages, so both stores are emptied.
+const DB_VERSION = 4;
 const MESSAGES_STORE = "messages";
 const METADATA_STORE = "metadata";
 
@@ -122,10 +147,11 @@ class MessageCacheService {
         messagesStore.createIndex("createdAt", "createdAt", { unique: false });
         console.log("✓ Created messages object store");
 
-        if (!db.objectStoreNames.contains(METADATA_STORE)) {
-          db.createObjectStore(METADATA_STORE, { keyPath: "key" });
-          console.log("✓ Created metadata object store");
+        if (db.objectStoreNames.contains(METADATA_STORE)) {
+          db.deleteObjectStore(METADATA_STORE);
         }
+        db.createObjectStore(METADATA_STORE, { keyPath: "key" });
+        console.log("✓ Created metadata object store");
       };
     });
   }
@@ -269,7 +295,45 @@ class MessageCacheService {
     await this.cacheMessages(conversationId, newestPage);
   }
 
+  async getChangesPosition(
+    conversationId: string,
+  ): Promise<ChangesPosition | null> {
+    const db = await this.ensureDB();
+    return new Promise<ChangesPosition | null>((resolve) => {
+      const request = db
+        .transaction([METADATA_STORE], "readonly")
+        .objectStore(METADATA_STORE)
+        .get(`changes_${conversationId}`);
+      request.onsuccess = () => resolve(request.result?.value ?? null);
+      request.onerror = () => resolve(null);
+    });
+  }
+
+  async setChangesPosition(
+    conversationId: string,
+    position: ChangesPosition | null,
+  ): Promise<void> {
+    const db = await this.ensureDB();
+    return new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction([METADATA_STORE], "readwrite");
+      const store = transaction.objectStore(METADATA_STORE);
+      const key = `changes_${conversationId}`;
+      if (position) {
+        store.put({ key, value: position });
+      } else {
+        store.delete(key);
+      }
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  }
+
   async clearConversationCache(conversationId: string): Promise<void> {
+    // The stored changes position belongs to the cleared messages
+    await this.setChangesPosition(conversationId, null).catch((error) =>
+      console.error("Error clearing changes position:", error),
+    );
+
     const db = await this.ensureDB();
     const transaction = db.transaction([MESSAGES_STORE], "readwrite");
     const messagesStore = transaction.objectStore(MESSAGES_STORE);

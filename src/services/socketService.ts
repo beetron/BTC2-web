@@ -7,7 +7,11 @@
 import { Socket, io } from "socket.io-client";
 import { CONFIG } from "../config";
 import { authService } from "./authService";
-import { authEventEmitter, attemptTokenRefresh } from "./apiClient";
+import {
+  authEventEmitter,
+  attemptTokenRefresh,
+  setSocketIdProvider,
+} from "./apiClient";
 
 interface EventListener {
   event: string;
@@ -47,9 +51,8 @@ class SocketService {
       const socketUrlObj = new URL(CONFIG.socketUrl);
       const socketBaseUrl = `${socketUrlObj.protocol}//${socketUrlObj.host}`;
 
-      // Identity comes solely from the JWT in the auth payload -- the legacy
-      // userId query param is no longer sent, matching the API's upcoming
-      // SOCKET_REQUIRE_AUTH=true enforcement.
+      // Identity comes solely from the JWT in the auth payload; the API
+      // rejects any handshake without a valid token.
       this.socket = io(socketBaseUrl, {
         path: CONFIG.isDevelopment ? "/socket.io" : "/btc-api/socket.io",
         reconnection: true,
@@ -94,9 +97,9 @@ class SocketService {
 
     this.socket.on("connect_error", async (error) => {
       console.error("Socket connection error:", error);
-      // The server rejects the handshake with "Unauthorized" when
-      // SOCKET_REQUIRE_AUTH is enabled and the access token is
-      // missing/expired. Try a silent refresh before giving up -- on
+      // The server rejects the handshake with "Unauthorized" when the
+      // access token is missing, expired or revoked. Try a silent refresh
+      // before giving up -- on
       // success, just update the auth payload; socket.io's own
       // reconnection loop will pick up the new token on its next
       // automatic attempt. Only log out if refresh also fails.
@@ -235,4 +238,5 @@ class SocketService {
 }
 
 export const socketService = new SocketService();
+setSocketIdProvider(() => socketService.getSocketId());
 export default socketService;

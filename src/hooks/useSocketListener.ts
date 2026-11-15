@@ -21,7 +21,7 @@ interface UseSocketListenerOptions {
  * @example
  * const { socket } = useSocket();
  * useSocketListener(socket, {
- *   eventName: "newMessageSignal",
+ *   eventName: "conversation:updated",
  *   onEvent: async () => {
  *     await loadMessages();
  *   }
