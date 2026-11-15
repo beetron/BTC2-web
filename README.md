@@ -192,6 +192,7 @@ src/
 ## 🔌 Real-time (Socket.IO)
 
 - `socketService` connects with the access token as `auth: { token }` — no query-string identity is sent.
+- A dropped connection is retried for as long as the tab is open (1 second at first, then every 5 seconds at most), so a long API rollout or network outage never leaves a tab without real-time updates.
 - Listened-for events (see `useSocketListener`): `conversation:message`, `conversation:memberAdded`, `conversation:memberRemoved`, `conversation:updated`.
 - `conversation:message` carries an `action`. For `created` (or no action, as after an admin purge) the open chat refetches the newest page, which also marks it read; for every action it then reads the changes feed (`GET /conversations/:id/messages/changes`) from the cursor saved in IndexedDB. A socket reconnect runs both, to catch anything missed while offline.
 - Sending, uploading, editing and deleting send the tab's socket id as `X-Socket-Id`, so the API skips only this tab for the event and the user's other tabs and devices still update. The tab itself shows the message from the API response at once.

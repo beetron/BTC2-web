@@ -60,10 +60,14 @@ class SocketService {
       // rejects any handshake without a valid token.
       this.socket = io(socketBaseUrl, {
         path: CONFIG.isDevelopment ? "/socket.io" : "/btc-api/socket.io",
+        // Keep retrying (every 5 seconds at most) for as long as the tab is
+        // open, so a long API rollout or network drop never leaves the tab
+        // without real-time updates. A rejected token does not loop: the
+        // connect_error handler below logs out when the refresh fails.
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: Infinity,
         auth: {
           token: token,
         },
