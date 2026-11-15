@@ -13,8 +13,10 @@ import {
   IconPencil,
   IconCheck,
   IconX,
+  IconPhotoOff,
 } from "@tabler/icons-react";
 import { useState, useRef, useEffect } from "react";
+import { useMessageImage } from "../hooks/useMessageImage";
 import {
   conversationService,
   ConversationMessage,
@@ -46,8 +48,47 @@ interface MessageInputProps {
 
 const replySnippet = (msg: ConversationMessage): string => {
   if (msg.message) return msg.message;
-  if (msg.imageFiles && msg.imageFiles.length > 0) return "Photo";
+  if (msg.imageFiles && msg.imageFiles.length > 0) {
+    return msg.imagesExpiredAt ? "Photo expired" : "Photo";
+  }
   return "";
+};
+
+/** Thumbnail of the first photo of the message being replied to */
+const ReplyThumbnail: React.FC<{ message: ConversationMessage }> = ({ message }) => {
+  const hasImages = (message.imageFiles?.length ?? 0) > 0;
+  const expired = Boolean(message.imagesExpiredAt);
+  const { src, failed } = useMessageImage(
+    hasImages && !expired ? message.imageFiles![0] : null,
+  );
+  if (!hasImages) return null;
+
+  return (
+    <Box
+      style={{
+        width: 32,
+        height: 32,
+        flexShrink: 0,
+        borderRadius: "4px",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--mantine-color-default-border)",
+        color: "var(--mantine-color-dimmed)",
+      }}
+    >
+      {src ? (
+        <img
+          src={src}
+          alt="Photo being replied to"
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : (
+        (expired || failed) && <IconPhotoOff size={16} />
+      )}
+    </Box>
+  );
 };
 
 export const MessageInput: React.FC<MessageInputProps> = ({
@@ -310,6 +351,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         icon={<IconArrowBackUp size={16} />}
         title={`Replying to ${replyTo.senderName}`}
         snippet={replySnippet(replyTo.message)}
+        thumbnail={<ReplyThumbnail message={replyTo.message} />}
         onCancel={() => onCancelReply?.()}
         cancelLabel="Cancel reply"
       />
@@ -387,9 +429,10 @@ const ContextBar: React.FC<{
   icon: React.ReactNode;
   title: string;
   snippet: string;
+  thumbnail?: React.ReactNode;
   cancelLabel: string;
   onCancel: () => void;
-}> = ({ icon, title, snippet, cancelLabel, onCancel }) => (
+}> = ({ icon, title, snippet, thumbnail, cancelLabel, onCancel }) => (
   <Group
     gap="xs"
     wrap="nowrap"
@@ -412,6 +455,7 @@ const ContextBar: React.FC<{
         {snippet}
       </Text>
     </Box>
+    {thumbnail}
     <ActionIcon
       variant="subtle"
       color="gray"

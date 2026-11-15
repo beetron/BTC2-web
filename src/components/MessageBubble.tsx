@@ -18,8 +18,9 @@ import {
   Text,
   useMantineColorScheme,
 } from "@mantine/core";
-import { IconPhoto } from "@tabler/icons-react";
+import { IconPhoto, IconPhotoOff } from "@tabler/icons-react";
 import { memo } from "react";
+import { useMessageImage } from "../hooks/useMessageImage";
 import {
   ConversationMessage,
   ReplyPreview,
@@ -43,6 +44,8 @@ interface MessageBubbleProps {
   showSenderName: boolean;
   /** filename -> blob URL for message images loaded so far */
   imageBlobUrls: Map<string, string>;
+  /** Images that could not be loaded (shown as unavailable) */
+  failedImageFiles: Set<string>;
   /** Briefly outlined after jumping to it from a quote */
   highlighted: boolean;
   getSenderName: (senderId: string | null) => string;
@@ -66,6 +69,53 @@ const formatTimestamp = (timestamp: string): string => {
   return `${month}/${day}/'${year} (${hours}:${minutes})`;
 };
 
+/** Size of the photo thumbnail next to quoted text, in pixels */
+const QUOTE_THUMBNAIL_SIZE = 36;
+/** A quote that is only a photo shows it a little larger */
+const QUOTE_PHOTO_ONLY_SIZE = 48;
+
+/**
+ * Square thumbnail of a quoted photo. Shows a "photo off" icon when the
+ * photo expired or could not be loaded.
+ */
+const QuoteThumbnail: React.FC<{
+  imageFile: string | null;
+  expired: boolean;
+  isCurrentUser: boolean;
+  size?: number;
+}> = ({ imageFile, expired, isCurrentUser, size = QUOTE_THUMBNAIL_SIZE }) => {
+  const { src, failed } = useMessageImage(expired ? null : imageFile);
+  const box: React.CSSProperties = {
+    width: size,
+    height: size,
+    flexShrink: 0,
+    borderRadius: "4px",
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: isCurrentUser ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.08)",
+    color: isCurrentUser ? "white" : "#495057",
+  };
+
+  if (src) {
+    return (
+      <Box style={box}>
+        <img
+          src={src}
+          alt="Quoted photo"
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      </Box>
+    );
+  }
+  return (
+    <Box style={box} title={expired || failed ? "Photo expired" : undefined}>
+      {(expired || failed) && <IconPhotoOff size={18} />}
+    </Box>
+  );
+};
+
 const QuotedMessage: React.FC<{
   replyTo: ReplyPreview;
   isCurrentUser: boolean;
@@ -74,6 +124,45 @@ const QuotedMessage: React.FC<{
 }> = ({ replyTo, isCurrentUser, getSenderName, onClick }) => {
   const textColor = isCurrentUser ? "white" : "black";
   const clickable = !replyTo.unavailable && !replyTo.deleted;
+  const imagesExpired = Boolean(replyTo.imagesExpired);
+  // Replies cached before API 2.1.0 have no imageFile: no thumbnail, just
+  // the "Photo" label as before
+  const showThumbnail =
+    clickable && replyTo.hasImages && (Boolean(replyTo.imageFile) || imagesExpired);
+
+  const boxStyle: React.CSSProperties = {
+    cursor: clickable ? "pointer" : "default",
+    borderLeft: `3px solid ${isCurrentUser ? "rgba(255,255,255,0.7)" : "#868E96"}`,
+    background: isCurrentUser ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.07)",
+    borderRadius: "4px",
+    padding: "4px 8px",
+  };
+
+  // A quoted photo without text: the thumbnail says it all, so no sender
+  // name and no "Photo" label. Only an expired photo keeps a short note,
+  // since there is no picture left to show.
+  if (showThumbnail && !replyTo.message) {
+    return (
+      <Group
+        gap="xs"
+        wrap="nowrap"
+        onClick={() => onClick(replyTo._id)}
+        style={{ ...boxStyle, alignSelf: "flex-start" }}
+      >
+        <QuoteThumbnail
+          imageFile={replyTo.imageFile ?? null}
+          expired={imagesExpired}
+          isCurrentUser={isCurrentUser}
+          size={QUOTE_PHOTO_ONLY_SIZE}
+        />
+        {imagesExpired && (
+          <Text size="xs" c={textColor} fs="italic" style={{ opacity: 0.85 }}>
+            Photo expired
+          </Text>
+        )}
+      </Group>
+    );
+  }
 
   let body: React.ReactNode;
   if (replyTo.unavailable) {
@@ -85,40 +174,70 @@ const QuotedMessage: React.FC<{
   } else if (replyTo.hasImages) {
     body = (
       <Group gap={4} component="span" wrap="nowrap">
-        <IconPhoto size={14} />
-        Photo
+        {imagesExpired ? <IconPhotoOff size={14} /> : <IconPhoto size={14} />}
+        {imagesExpired ? "Photo expired" : "Photo"}
       </Group>
     );
   }
 
   return (
-    <Box
+    <Group
+      gap="xs"
+      wrap="nowrap"
+      align="center"
       onClick={clickable ? () => onClick(replyTo._id) : undefined}
-      style={{
-        cursor: clickable ? "pointer" : "default",
-        borderLeft: `3px solid ${isCurrentUser ? "rgba(255,255,255,0.7)" : "#868E96"}`,
-        background: isCurrentUser ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.07)",
-        borderRadius: "4px",
-        padding: "4px 8px",
-      }}
+      style={boxStyle}
     >
-      {!replyTo.unavailable && (
-        <Text size="xs" fw={700} c={textColor}>
-          {getSenderName(replyTo.senderId)}
+      <Box style={{ flex: 1, minWidth: 0 }}>
+        {!replyTo.unavailable && (
+          <Text size="xs" fw={700} c={textColor}>
+            {getSenderName(replyTo.senderId)}
+          </Text>
+        )}
+        <Text
+          size="xs"
+          c={textColor}
+          lineClamp={2}
+          style={{ opacity: 0.85, wordBreak: "break-word" }}
+          component="div"
+        >
+          {body}
         </Text>
+      </Box>
+      {showThumbnail && (
+        <QuoteThumbnail
+          imageFile={replyTo.imageFile ?? null}
+          expired={imagesExpired}
+          isCurrentUser={isCurrentUser}
+        />
       )}
-      <Text
-        size="xs"
-        c={textColor}
-        lineClamp={2}
-        style={{ opacity: 0.85, wordBreak: "break-word" }}
-        component="div"
-      >
-        {body}
-      </Text>
-    </Box>
+    </Group>
   );
 };
+
+/** One small line in place of photos the server no longer keeps */
+const ExpiredPhotos: React.FC<{ count: number; isCurrentUser: boolean }> = ({
+  count,
+  isCurrentUser,
+}) => (
+  <Group
+    gap={6}
+    wrap="nowrap"
+    title="This photo is no longer stored on the server"
+    style={{
+      marginTop: "0.25rem",
+      padding: "6px 8px",
+      borderRadius: "4px",
+      background: isCurrentUser ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.07)",
+      color: isCurrentUser ? "rgba(255,255,255,0.85)" : "#495057",
+    }}
+  >
+    <IconPhotoOff size={16} />
+    <Text size="xs" c="inherit" fs="italic">
+      {count === 1 ? "Photo expired" : `${count} photos expired`}
+    </Text>
+  </Group>
+);
 
 const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   msg,
@@ -126,6 +245,7 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   sender,
   showSenderName,
   imageBlobUrls,
+  failedImageFiles,
   highlighted,
   getSenderName,
   onOpenImages,
@@ -237,7 +357,13 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
                   </Text>
                 )}
                 {firstUrl && <LinkPreviewCard url={firstUrl} />}
-                {msg.imageFiles && msg.imageFiles.length > 0 && (
+                {msg.imagesExpiredAt && (msg.imageFiles?.length ?? 0) > 0 && (
+                  <ExpiredPhotos
+                    count={msg.imageFiles!.length}
+                    isCurrentUser={isCurrentUser}
+                  />
+                )}
+                {!msg.imagesExpiredAt && msg.imageFiles && msg.imageFiles.length > 0 && (
                   <SimpleGrid
                     cols={msg.imageFiles.length === 1 ? 1 : 2}
                     spacing="xs"
@@ -270,6 +396,23 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
                               height={250}
                               fit="cover"
                             />
+                          ) : failedImageFiles.has(filename) ? (
+                            <Group
+                              gap={6}
+                              justify="center"
+                              wrap="nowrap"
+                              style={{
+                                height: "120px",
+                                background:
+                                  colorScheme === "dark" ? "#373A40" : "#E9ECEF",
+                                color: "#909296",
+                              }}
+                            >
+                              <IconPhotoOff size={18} />
+                              <Text size="xs" c="inherit">
+                                Photo unavailable
+                              </Text>
+                            </Group>
                           ) : (
                             <Box
                               style={{

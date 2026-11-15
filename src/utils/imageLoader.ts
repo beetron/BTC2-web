@@ -4,8 +4,17 @@
  */
 
 import { authService } from "../services/authService";
+import { CONFIG } from "../config";
 
 const imageCaches = new Map<string, Map<string, string>>();
+
+// Requests still in flight, so a thumbnail and the full image asking for
+// the same file at the same time share one download
+const pendingLoads = new Map<string, Promise<string>>();
+
+/** URL of an uploaded message image (direct and group conversations) */
+export const messageImageUrl = (filename: string): string =>
+  `${CONFIG.apiUrl}/messages/uploads/images/${filename}`;
 
 /**
  * Get or create cache for specific user
@@ -35,6 +44,22 @@ export const loadImageWithAuth = async (imageUrl: string): Promise<string> => {
     return imageCache.get(imageUrl)!;
   }
 
+  const pending = pendingLoads.get(imageUrl);
+  if (pending) return pending;
+
+  const load = fetchAsDataUrl(imageUrl, imageCache);
+  pendingLoads.set(imageUrl, load);
+  try {
+    return await load;
+  } finally {
+    pendingLoads.delete(imageUrl);
+  }
+};
+
+const fetchAsDataUrl = async (
+  imageUrl: string,
+  imageCache: Map<string, string>,
+): Promise<string> => {
   try {
     const token = authService.getToken();
     if (!token) {

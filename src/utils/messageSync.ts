@@ -53,16 +53,23 @@ export const findDeletedMessageIds = (
 /** Same length the API cuts a reply preview to (REPLY_PREVIEW_LENGTH) */
 const REPLY_PREVIEW_LENGTH = 200;
 
-const toReplyPreview = (quoted: ConversationMessage): ReplyPreview => ({
-  _id: quoted._id,
-  senderId: quoted.senderId,
-  message: quoted.deletedAt
-    ? null
-    : (quoted.message ?? "").slice(0, REPLY_PREVIEW_LENGTH),
-  hasImages: !quoted.deletedAt && (quoted.imageFiles?.length ?? 0) > 0,
-  deleted: Boolean(quoted.deletedAt),
-  unavailable: false,
-});
+// Same rules as the API's replyPreview (btc2-api src/services/messageView.js)
+const toReplyPreview = (quoted: ConversationMessage): ReplyPreview => {
+  const hasImages = !quoted.deletedAt && (quoted.imageFiles?.length ?? 0) > 0;
+  const imagesExpired = hasImages && Boolean(quoted.imagesExpiredAt);
+  return {
+    _id: quoted._id,
+    senderId: quoted.senderId,
+    message: quoted.deletedAt
+      ? null
+      : (quoted.message ?? "").slice(0, REPLY_PREVIEW_LENGTH),
+    hasImages,
+    imageFile: hasImages && !imagesExpired ? quoted.imageFiles![0] : null,
+    imagesExpired,
+    deleted: Boolean(quoted.deletedAt),
+    unavailable: false,
+  };
+};
 
 /**
  * Applies messages from the changes feed (or our own send, edit or delete)

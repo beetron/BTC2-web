@@ -26,13 +26,12 @@ import {
 } from "../services/conversationService";
 import { messageCacheService } from "../services/messageCacheService";
 import { useSocketListener } from "../hooks/useSocketListener";
-import { loadImageWithAuth } from "../utils/imageLoader";
+import { loadImageWithAuth, messageImageUrl } from "../utils/imageLoader";
 import {
   applyMessageChanges,
   findDeletedMessageIds,
   newestChangeTime,
 } from "../utils/messageSync";
-import { CONFIG } from "../config";
 import { MessageBubble, MemberDisplay } from "./MessageBubble";
 import { MessageContextMenu, MessageMenuState } from "./MessageContextMenu";
 
@@ -116,6 +115,11 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
     const [messageImageBlobUrls, setMessageImageBlobUrls] = useState<
       Map<string, string>
     >(new Map());
+    // Images the last load could not fetch (e.g. expired before this copy
+    // of the message knew it), shown as unavailable instead of loading
+    const [failedImageFiles, setFailedImageFiles] = useState<Set<string>>(
+      new Set(),
+    );
     const [selectedImageBlobUrls, setSelectedImageBlobUrls] = useState<
       string[]
     >([]);
@@ -157,6 +161,9 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
         const failedImages = new Set<string>();
 
         for (const msg of messages) {
+          // Expired photos are gone from the server; the bubble shows a
+          // placeholder instead of requesting them
+          if (msg.imagesExpiredAt) continue;
           if (msg.imageFiles && msg.imageFiles.length > 0) {
             for (const filename of msg.imageFiles) {
               // Skip if already marked as failed
@@ -165,8 +172,7 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
               }
 
               try {
-                const imageUrl = `${CONFIG.apiUrl}/messages/uploads/images/${filename}`;
-                const blobUrl = await loadImageWithAuth(imageUrl);
+                const blobUrl = await loadImageWithAuth(messageImageUrl(filename));
                 blobUrls.set(filename, blobUrl);
               } catch (error) {
                 console.error(`Failed to load image ${filename}:`, error);
@@ -177,6 +183,7 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
         }
 
         setMessageImageBlobUrls(blobUrls);
+        setFailedImageFiles(failedImages);
       };
 
       if (messages.length > 0) {
@@ -570,6 +577,7 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
                   sender={memberMap[msg.senderId]}
                   showSenderName={conversationType === "group" && !isCurrentUser}
                   imageBlobUrls={messageImageBlobUrls}
+                  failedImageFiles={failedImageFiles}
                   highlighted={highlightedId === msg._id}
                   getSenderName={getSenderName}
                   onOpenImages={handleOpenImages}
