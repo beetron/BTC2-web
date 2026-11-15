@@ -26,9 +26,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { ThemeToggle } from "./ThemeToggle";
 import { notifications } from "@mantine/notifications";
 
-interface HeaderProps {}
-
-export const Header: React.FC<HeaderProps> = () => {
+export const Header: React.FC = () => {
   const [opened, { toggle, close }] = useDisclosure(false);
   const navigate = useNavigate();
   const { logout, isAdmin } = useAuth();

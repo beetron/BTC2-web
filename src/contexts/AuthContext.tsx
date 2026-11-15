@@ -11,7 +11,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { authService } from "../services/authService";
+import { authService, AuthResponse } from "../services/authService";
 import { userService } from "../services/userService";
 import { authEventEmitter } from "../services/apiClient";
 import { clearImageCache } from "../utils/imageLoader";
@@ -39,7 +39,7 @@ interface AuthContextType extends Profile {
     password: string,
     email: string,
     uniqueId: string,
-  ) => Promise<any>;
+  ) => Promise<AuthResponse>;
   logout: () => void;
   deleteAccount: () => Promise<void>;
   forgotUsername: (email: string) => Promise<void>;
@@ -179,7 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const previousUserId = localStorage.getItem("userId");
 
     try {
-      const response = (await authService.login({ username, password })) as any;
+      const response = (await authService.login({ username, password }));
       const newUserId = response.userId || response._id;
 
       if (previousUserId && previousUserId !== newUserId) {
@@ -223,12 +223,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const previousUserId = localStorage.getItem("userId");
 
     try {
-      const response = (await authService.signup({
+      const response = await authService.signup({
         username,
         email,
         password,
         uniqueId,
-      })) as any;
+      });
       const newUserId = response.userId || response._id;
 
       if (previousUserId && previousUserId !== newUserId) {

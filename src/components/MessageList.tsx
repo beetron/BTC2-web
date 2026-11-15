@@ -1,22 +1,25 @@
 import {
   Box,
   Loader,
-  Paper,
   Stack,
   Text,
   Center,
-  Avatar,
   Group,
-  useMantineColorScheme,
-  Anchor,
   Modal,
   Image,
   Button,
-  SimpleGrid,
 } from "@mantine/core";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
-import { useEffect, useState, useCallback, useRef, forwardRef } from "react";
+import { Socket } from "socket.io-client";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import {
   conversationService,
   ConversationMessage,
@@ -24,14 +27,20 @@ import {
 import { messageCacheService } from "../services/messageCacheService";
 import { useSocketListener } from "../hooks/useSocketListener";
 import { loadImageWithAuth } from "../utils/imageLoader";
-import { parseUrlsInText, getHrefFromUrl, extractFirstUrl } from "../utils/urlParser";
-import { LinkPreviewCard } from "./LinkPreviewCard";
-import { findDeletedMessageIds } from "../utils/messageSync";
+import {
+  applyMessageChanges,
+  findDeletedMessageIds,
+  newestChangeTime,
+} from "../utils/messageSync";
 import { CONFIG } from "../config";
+import { MessageBubble, MemberDisplay } from "./MessageBubble";
+import { MessageContextMenu, MessageMenuState } from "./MessageContextMenu";
 
-export interface MemberDisplay {
-  nickname: string | null;
-  profileImageUrl: string | null;
+export type { MemberDisplay } from "./MessageBubble";
+
+/** Lets the page show a message it just sent, edited or deleted right away */
+export interface MessageListHandle {
+  upsertMessage: (msg: ConversationMessage) => void;
 }
 
 interface MessageListProps {
@@ -39,13 +48,22 @@ interface MessageListProps {
   conversationType: "direct" | "group";
   /** userId -> display info for every active member (including self) */
   memberMap: Record<string, MemberDisplay>;
-  socket: any;
+  socket: Socket | null;
+  handleRef?: React.Ref<MessageListHandle>;
+  onReply?: (msg: ConversationMessage) => void;
+  onEdit?: (msg: ConversationMessage) => void;
+  /** Fired after one of our messages is deleted for everyone */
+  onMessageDeleted?: (messageId: string) => void;
   onScrollStateChange?: (isScrolledToBottom: boolean) => void;
   /** Fired whenever the loaded message count changes (initial load, new
    * messages, older pages) so the parent can drive UI like the delete-
    * history button without separately polling the cache. */
   onMessageCountChange?: (count: number) => void;
 }
+
+// How many changes-feed pages (up to 200 changes each) one sync may read.
+// The cursor is saved after every page, so the next sync continues.
+const MAX_CHANGE_PAGES_PER_SYNC = 10;
 
 const sortAscending = (messages: ConversationMessage[]) =>
   [...messages].sort(
@@ -62,6 +80,15 @@ const mergeMessages = (
   return sortAscending([...byId.values()]);
 };
 
+const cacheInBackground = (
+  conversationId: string,
+  messages: ConversationMessage[],
+) => {
+  messageCacheService
+    .cacheMessages(conversationId, messages)
+    .catch((error) => console.error("Background cache error:", error));
+};
+
 export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
   (
     {
@@ -69,13 +96,18 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
       conversationType,
       memberMap,
       socket,
+      handleRef,
+      onReply,
+      onEdit,
+      onMessageDeleted,
       onScrollStateChange,
       onMessageCountChange,
     },
     ref,
   ) => {
-    const { colorScheme } = useMantineColorScheme();
     const [messages, setMessages] = useState<ConversationMessage[]>([]);
+    // Always the latest list, so async syncs never work on a stale copy
+    const messagesRef = useRef<ConversationMessage[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [nextCursor, setNextCursor] = useState<string | null>(null);
     const [isLoadingOlder, setIsLoadingOlder] = useState(false);
@@ -87,6 +119,11 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
     const [selectedImageBlobUrls, setSelectedImageBlobUrls] = useState<
       string[]
     >([]);
+    const [menuState, setMenuState] = useState<MessageMenuState | null>(null);
+    const [deleteTarget, setDeleteTarget] =
+      useState<ConversationMessage | null>(null);
+    const [isDeletingMessage, setIsDeletingMessage] = useState(false);
+    const [highlightedId, setHighlightedId] = useState<string | null>(null);
     const currentUserId = localStorage.getItem("userId") || "";
     const internalScrollRef = useRef<HTMLDivElement>(null);
     // Use provided ref or internal ref - always treat as RefObject
@@ -97,6 +134,21 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
     // Height captured just before prepending older messages, so the viewport
     // can be kept anchored on the same message after the prepend renders
     const prependScrollHeightRef = useRef<number | null>(null);
+    // One changes sync at a time; a request during a run queues one more
+    const changesSyncRef = useRef<{ running: boolean; again: boolean }>({
+      running: false,
+      again: false,
+    });
+    const highlightTimerRef = useRef<number | null>(null);
+
+    const commitMessages = useCallback(
+      (update: (current: ConversationMessage[]) => ConversationMessage[]) => {
+        const next = update(messagesRef.current);
+        messagesRef.current = next;
+        setMessages(next);
+      },
+      [],
+    );
 
     // Load message images with auth headers
     useEffect(() => {
@@ -134,15 +186,17 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
 
     /**
      * Fetch the newest page from the API, merge it into state + cache.
-     * Also (re)establishes the pagination cursor for loading older pages.
+     * Also (re)establishes the pagination cursor for loading older pages,
+     * and marks the conversation read server-side.
      */
     const syncNewestPage = useCallback(async () => {
       const { messages: page, nextCursor: cursor } =
         await conversationService.getMessages(conversationId);
       const hasOlder = cursor !== null;
-      setMessages((current) => {
-        // Drop anything the server deleted (e.g. an admin purge) before
-        // merging, so it disappears from an open chat without a reload
+      commitMessages((current) => {
+        // Drop anything the server no longer has at all (e.g. an admin
+        // purge) before merging, so it disappears from an open chat without
+        // a reload. Messages deleted for everyone come back as tombstones.
         const deleted = new Set(findDeletedMessageIds(current, page, hasOlder));
         const kept = deleted.size
           ? current.filter((m) => !deleted.has(m._id))
@@ -152,9 +206,74 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
       setNextCursor((current) => current ?? cursor);
       // Cache in the background — don't block the UI
       messageCacheService
-        .syncNewestPage(conversationId, page as any, hasOlder)
+        .syncNewestPage(conversationId, page, hasOlder)
         .catch((error) => console.error("Background cache error:", error));
-    }, [conversationId]);
+    }, [conversationId, commitMessages]);
+
+    /**
+     * Catch up on messages created, edited or deleted since the last sync,
+     * including ones older than the newest page, which a refetch misses.
+     */
+    const runChangesSync = useCallback(async () => {
+      let position = await messageCacheService
+        .getChangesPosition(conversationId)
+        .catch(() => null);
+
+      if (!position) {
+        // First visit: the newest page was just loaded fresh, so start
+        // from the newest server timestamp it holds
+        const since =
+          newestChangeTime(messagesRef.current) ?? new Date(0).toISOString();
+        await messageCacheService
+          .setChangesPosition(conversationId, { since })
+          .catch((error) => console.error("Changes position error:", error));
+        return;
+      }
+
+      for (let page = 0; page < MAX_CHANGE_PAGES_PER_SYNC; page++) {
+        const result = await conversationService.getMessageChanges(
+          conversationId,
+          position,
+        );
+
+        if (result.messages.length > 0) {
+          let applied: ConversationMessage[] = [];
+          commitMessages((current) => {
+            const outcome = applyMessageChanges(current, result.messages);
+            applied = outcome.applied;
+            return outcome.messages;
+          });
+          if (applied.length > 0) cacheInBackground(conversationId, applied);
+        }
+
+        if (result.nextCursor) {
+          position = { cursor: result.nextCursor };
+          await messageCacheService
+            .setChangesPosition(conversationId, position)
+            .catch((error) => console.error("Changes position error:", error));
+        }
+        if (!result.hasMore) break;
+      }
+    }, [conversationId, commitMessages]);
+
+    const syncChanges = useCallback(async () => {
+      const state = changesSyncRef.current;
+      if (state.running) {
+        state.again = true;
+        return;
+      }
+      state.running = true;
+      try {
+        do {
+          state.again = false;
+          await runChangesSync();
+        } while (state.again);
+      } catch (error) {
+        console.error("Failed to sync message changes:", error);
+      } finally {
+        state.running = false;
+      }
+    }, [runChangesSync]);
 
     const loadMessages = useCallback(async () => {
       setIsLoading(true);
@@ -165,7 +284,7 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
           .catch(() => []);
 
         if (cached.length > 0) {
-          setMessages(sortAscending(cached as ConversationMessage[]));
+          commitMessages(() => sortAscending(cached as ConversationMessage[]));
           shouldScrollToBottomRef.current = true;
           setIsLoading(false);
           console.log(
@@ -188,7 +307,9 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
       } finally {
         setIsLoading(false);
       }
-    }, [conversationId, syncNewestPage]);
+      // Edits and deletes of cached messages older than the newest page
+      await syncChanges();
+    }, [conversationId, syncNewestPage, syncChanges, commitMessages]);
 
     /**
      * Load the next (older) page when the user scrolls to the top
@@ -207,30 +328,38 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
           await conversationService.getMessages(conversationId, {
             cursor: nextCursor,
           });
-        setMessages((current) => mergeMessages(current, page));
+        commitMessages((current) => mergeMessages(current, page));
         setNextCursor(cursor);
-        messageCacheService
-          .cacheMessages(conversationId, page as any)
-          .catch((error) => console.error("Background cache error:", error));
+        cacheInBackground(conversationId, page);
       } catch (error) {
         console.error("Failed to load older messages:", error);
       } finally {
         isLoadingOlderRef.current = false;
         setIsLoadingOlder(false);
       }
-    }, [conversationId, nextCursor, scrollContainerRef]);
+    }, [conversationId, nextCursor, scrollContainerRef, commitMessages]);
 
     useEffect(() => {
-      setMessages([]);
+      commitMessages(() => []);
       setNextCursor(null);
+      setMenuState(null);
       loadMessages();
-    }, [conversationId, loadMessages]);
+    }, [conversationId, loadMessages, commitMessages]);
 
     // Report the loaded message count to the parent (drives the delete-
     // history button) on every change, not just ones the current user caused
     useEffect(() => {
       onMessageCountChange?.(messages.length);
     }, [messages, onMessageCountChange]);
+
+    useEffect(
+      () => () => {
+        if (highlightTimerRef.current) {
+          window.clearTimeout(highlightTimerRef.current);
+        }
+      },
+      [],
+    );
 
     // Keep scroll position stable after prepending older messages, or stick
     // to the bottom for fresh messages
@@ -257,6 +386,25 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
       }
     }, [messages, scrollContainerRef]);
 
+    // Show our own send, edit or delete at once. The API skips this tab's
+    // socket for it (X-Socket-Id), so no event will follow here.
+    const upsertMessage = useCallback(
+      (msg: ConversationMessage) => {
+        const isNew = !messagesRef.current.some((m) => m._id === msg._id);
+        let applied: ConversationMessage[] = [];
+        commitMessages((current) => {
+          const outcome = applyMessageChanges(current, [msg]);
+          applied = outcome.applied;
+          return outcome.messages;
+        });
+        if (isNew) shouldScrollToBottomRef.current = true;
+        if (applied.length > 0) cacheInBackground(conversationId, applied);
+      },
+      [conversationId, commitMessages],
+    );
+
+    useImperativeHandle(handleRef, () => ({ upsertMessage }), [upsertMessage]);
+
     // Handle manual scroll - don't auto-scroll if user scrolled up, and
     // fetch older pages when the user reaches the top
     const handleScroll = () => {
@@ -266,27 +414,119 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
       const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
       shouldScrollToBottomRef.current = isAtBottom;
       onScrollStateChange?.(isAtBottom);
+      // The menu is pinned to the mouse position, not the message
+      if (menuState) setMenuState(null);
 
       if (scrollTop < 40 && nextCursor && !isLoadingOlderRef.current) {
         loadOlderMessages();
       }
     };
 
-    // New group/direct message in any conversation - only sync if it's ours
+    // A message in this conversation was created, edited or deleted.
+    // Created (or no action, e.g. after an admin purge): refetch the newest
+    // page, which also marks it read. Every action: catch up on changes.
     useSocketListener(socket, {
       eventName: "conversation:message",
-      onEvent: async (payload?: { conversationId?: string }) => {
-        if (!payload?.conversationId || payload.conversationId === conversationId) {
+      onEvent: async (payload?: { conversationId?: string; action?: string }) => {
+        if (payload?.conversationId && payload.conversationId !== conversationId) {
+          return;
+        }
+        if (payload?.action !== "edited" && payload?.action !== "deleted") {
           await syncNewestPage();
         }
+        await syncChanges();
       },
     });
 
-    // Legacy signal still emitted for direct messages from older clients
+    // Back after a dropped connection: events may have been missed
     useSocketListener(socket, {
-      eventName: "newMessageSignal",
-      onEvent: syncNewestPage,
+      eventName: "connect",
+      onEvent: async () => {
+        await syncNewestPage();
+        await syncChanges();
+      },
     });
+
+    const getSenderName = useCallback(
+      (senderId: string | null) => {
+        if (!senderId) return "Unknown";
+        if (senderId === currentUserId) return "You";
+        return memberMap[senderId]?.nickname || "Former member";
+      },
+      [memberMap, currentUserId],
+    );
+
+    const handleContextMenu = useCallback(
+      (event: React.MouseEvent, msg: ConversationMessage) => {
+        event.preventDefault();
+        setMenuState({ message: msg, x: event.clientX, y: event.clientY });
+      },
+      [],
+    );
+
+    const handleOpenImages = useCallback((blobUrls: string[], index: number) => {
+      setSelectedImageBlobUrls(blobUrls);
+      setCurrentImageIndex(index);
+      setImageModalOpen(true);
+    }, []);
+
+    const handleQuoteClick = useCallback(
+      (messageId: string) => {
+        const element = scrollContainerRef.current?.querySelector(
+          `[data-message-id="${messageId}"]`,
+        );
+        if (!element) {
+          notifications.show({
+            message: "The original message is further up. Scroll up to load it.",
+            color: "gray",
+          });
+          return;
+        }
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        setHighlightedId(messageId);
+        if (highlightTimerRef.current) {
+          window.clearTimeout(highlightTimerRef.current);
+        }
+        highlightTimerRef.current = window.setTimeout(
+          () => setHighlightedId(null),
+          1500,
+        );
+      },
+      [scrollContainerRef],
+    );
+
+    const handleCopy = async (msg: ConversationMessage) => {
+      try {
+        await navigator.clipboard.writeText(msg.message ?? "");
+        notifications.show({ message: "Copied to clipboard", color: "green" });
+      } catch {
+        notifications.show({
+          title: "Error",
+          message: "Could not copy the message",
+          color: "red",
+        });
+      }
+    };
+
+    const handleConfirmDelete = async () => {
+      if (!deleteTarget) return;
+      setIsDeletingMessage(true);
+      try {
+        const tombstone = await conversationService.deleteMessage(
+          conversationId,
+          deleteTarget._id,
+        );
+        upsertMessage(tombstone);
+        onMessageDeleted?.(deleteTarget._id);
+        setDeleteTarget(null);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Failed to delete message";
+        notifications.show({ title: "Error", message, color: "red" });
+      } finally {
+        setIsDeletingMessage(false);
+      }
+    };
 
     if (isLoading && messages.length === 0) {
       return (
@@ -322,240 +562,66 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
           ) : (
             messages.map((msg) => {
               const isCurrentUser = msg.senderId === currentUserId;
-              const sender = memberMap[msg.senderId];
-              const profileImageUrl = sender?.profileImageUrl || null;
-              const showSenderName =
-                conversationType === "group" && !isCurrentUser;
-              const firstUrl = msg.message ? extractFirstUrl(msg.message) : null;
-
               return (
-                <Group
+                <MessageBubble
                   key={msg._id}
-                  align="flex-start"
-                  justify={isCurrentUser ? "flex-end" : "flex-start"}
-                  gap="xs"
-                >
-                  {!isCurrentUser && (
-                    <Avatar
-                      src={profileImageUrl || undefined}
-                      alt={sender?.nickname || "Member"}
-                      size="md"
-                      radius="xl"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "";
-                      }}
-                    />
-                  )}
-                  <Stack gap={2} style={{ maxWidth: "70%" }}>
-                    {showSenderName && (
-                      <Text size="xs" c="dimmed" fw={500} pl={4}>
-                        {sender?.nickname || "Former member"}
-                      </Text>
-                    )}
-                    <Paper
-                      p="sm"
-                      radius="md"
-                      style={{
-                        backgroundColor: isCurrentUser ? "#387FDF" : "#DEE2E6",
-                      }}
-                    >
-                      <Stack gap="0.25rem">
-                        {msg.message && (
-                          <Text
-                            size="sm"
-                            fw={500}
-                            c={isCurrentUser ? "white" : "black"}
-                            style={{
-                              whiteSpace: "pre-wrap",
-                              wordBreak: "break-word",
-                              overflowWrap: "break-word",
-                            }}
-                            component="div"
-                          >
-                            {(() => {
-                              const parts = parseUrlsInText(msg.message);
-                              return parts.map((part, idx) => {
-                                if (part.type === "url") {
-                                  const href = getHrefFromUrl(part.content);
-                                  return (
-                                    <Anchor
-                                      key={idx}
-                                      href={href}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      c={
-                                        isCurrentUser
-                                          ? "rgba(255,255,255,0.9)"
-                                          : "#1971C2"
-                                      }
-                                      fw={500}
-                                      underline="always"
-                                      style={{
-                                        wordBreak: "break-word",
-                                        display: "inline",
-                                      }}
-                                    >
-                                      {part.content}
-                                    </Anchor>
-                                  );
-                                } else {
-                                  return (
-                                    <span
-                                      key={idx}
-                                      style={{ display: "inline" }}
-                                    >
-                                      {part.content}
-                                    </span>
-                                  );
-                                }
-                              });
-                            })()}
-                          </Text>
-                        )}
-                        {firstUrl && <LinkPreviewCard url={firstUrl} />}
-                        {msg.imageFiles && msg.imageFiles.length > 0 && (
-                          <SimpleGrid
-                            cols={msg.imageFiles.length === 1 ? 1 : 2}
-                            spacing="xs"
-                            style={{ marginTop: "0.5rem" }}
-                          >
-                            {msg.imageFiles.map((filename, idx) => {
-                              const blobUrl =
-                                messageImageBlobUrls.get(filename);
-                              return (
-                                <Box
-                                  key={idx}
-                                  style={{
-                                    cursor: blobUrl ? "pointer" : "default",
-                                    borderRadius: "0.25rem",
-                                    overflow: "hidden",
-                                    maxWidth: "280px",
-                                    opacity: blobUrl ? 1 : 0.5,
-                                  }}
-                                  onClick={() => {
-                                    if (!blobUrl) return; // Don't click if not loaded
-                                    const blobUrls = msg
-                                      .imageFiles!.map(
-                                        (f) =>
-                                          messageImageBlobUrls.get(f) || "",
-                                      )
-                                      .filter(Boolean);
-                                    setSelectedImageBlobUrls(blobUrls);
-                                    setCurrentImageIndex(idx);
-                                    setImageModalOpen(true);
-                                  }}
-                                >
-                                  {blobUrl ? (
-                                    <Image
-                                      src={blobUrl}
-                                      alt={`Message image ${idx + 1}`}
-                                      height={250}
-                                      fit="cover"
-                                    />
-                                  ) : (
-                                    <Box
-                                      style={{
-                                        height: "250px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        background:
-                                          colorScheme === "dark"
-                                            ? "#373A40"
-                                            : "#E9ECEF",
-                                        borderRadius: "0.25rem",
-                                      }}
-                                    >
-                                      <div style={{ textAlign: "center" }}>
-                                        <div
-                                          style={{
-                                            width: "40px",
-                                            height: "40px",
-                                            background:
-                                              colorScheme === "dark"
-                                                ? "#25262B"
-                                                : "#DEE2E6",
-                                            borderRadius: "0.5rem",
-                                            margin: "0 auto 0.5rem",
-                                            animation: "pulse 1.5s infinite",
-                                          }}
-                                        />
-                                        <div
-                                          style={{
-                                            fontSize: "0.75rem",
-                                            color: "#909296",
-                                          }}
-                                        >
-                                          Loading...
-                                        </div>
-                                      </div>
-                                    </Box>
-                                  )}
-                                </Box>
-                              );
-                            })}
-                          </SimpleGrid>
-                        )}
-                        <Text
-                          size="10px"
-                          fw={400}
-                          style={{ lineHeight: 1.2, letterSpacing: "0.3px" }}
-                          c={
-                            isCurrentUser
-                              ? "rgba(255,255,255,0.65)"
-                              : colorScheme === "dark"
-                                ? "rgba(0,0,0,0.55)"
-                                : "rgba(0,0,0,0.45)"
-                          }
-                        >
-                          {(() => {
-                            const date = new Date(msg.createdAt);
-                            const currentYear = new Date().getFullYear();
-                            const messageYear = date.getFullYear();
-                            const month = String(date.getMonth() + 1).padStart(
-                              2,
-                              "0",
-                            );
-                            const day = String(date.getDate()).padStart(2, "0");
-                            const hours = String(date.getHours()).padStart(
-                              2,
-                              "0",
-                            );
-                            const minutes = String(date.getMinutes()).padStart(
-                              2,
-                              "0",
-                            );
-
-                            // If message is from current year, omit the year
-                            if (messageYear === currentYear) {
-                              return `${month}/${day} (${hours}:${minutes})`;
-                            } else {
-                              const year = String(messageYear).slice(-2);
-                              return `${month}/${day}/'${year} (${hours}:${minutes})`;
-                            }
-                          })()}
-                        </Text>
-                      </Stack>
-                    </Paper>
-                  </Stack>
-                  {isCurrentUser && (
-                    <Avatar
-                      src={profileImageUrl || undefined}
-                      alt="You"
-                      size="md"
-                      radius="xl"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "";
-                      }}
-                    />
-                  )}
-                </Group>
+                  msg={msg}
+                  isCurrentUser={isCurrentUser}
+                  sender={memberMap[msg.senderId]}
+                  showSenderName={conversationType === "group" && !isCurrentUser}
+                  imageBlobUrls={messageImageBlobUrls}
+                  highlighted={highlightedId === msg._id}
+                  getSenderName={getSenderName}
+                  onOpenImages={handleOpenImages}
+                  onContextMenu={handleContextMenu}
+                  onQuoteClick={handleQuoteClick}
+                />
               );
             })
           )}
         </Box>
+
+        <MessageContextMenu
+          state={menuState}
+          currentUserId={currentUserId}
+          onClose={() => setMenuState(null)}
+          onReply={(msg) => onReply?.(msg)}
+          onCopy={handleCopy}
+          onEdit={(msg) => onEdit?.(msg)}
+          onDelete={(msg) => setDeleteTarget(msg)}
+        />
+
+        {/* Delete for everyone confirmation */}
+        <Modal
+          opened={deleteTarget !== null}
+          onClose={() => !isDeletingMessage && setDeleteTarget(null)}
+          title="Delete message"
+          centered
+        >
+          <Stack gap="md">
+            <Text size="sm">
+              Delete this message for everyone? This cannot be undone.
+              {(deleteTarget?.imageFiles?.length ?? 0) > 0 &&
+                " Every image in it is deleted too."}
+            </Text>
+            <Group justify="flex-end" gap="sm">
+              <Button
+                variant="light"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeletingMessage}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="red"
+                onClick={handleConfirmDelete}
+                loading={isDeletingMessage}
+              >
+                Delete
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
 
         {/* Image Modal */}
         <Modal

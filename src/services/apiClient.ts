@@ -24,6 +24,17 @@ class AuthEventEmitter {
 
 export const authEventEmitter = new AuthEventEmitter();
 
+// The socket service registers how to read this tab's socket id. Kept as a
+// callback so this module does not import socketService (which imports it).
+let socketIdProvider: () => string | undefined = () => undefined;
+
+export const setSocketIdProvider = (provider: () => string | undefined) => {
+  socketIdProvider = provider;
+};
+
+/** This tab's socket id, sent as X-Socket-Id on message writes */
+export const getCurrentSocketId = (): string | undefined => socketIdProvider();
+
 // Requests to these endpoints must never trigger a refresh-and-retry --
 // a 401 from /auth/refresh IS the "refresh failed" signal, not something
 // to recover from by refreshing again.

@@ -7,9 +7,11 @@
 import { useEffect } from "react";
 import { Socket } from "socket.io-client";
 
-interface UseSocketListenerOptions {
+// Socket.IO payloads are untyped JSON, so each caller declares the
+// parameter types its handler expects
+interface UseSocketListenerOptions<TArgs extends unknown[]> {
   eventName: string;
-  onEvent: (...args: any[]) => Promise<void> | void;
+  onEvent: (...args: TArgs) => Promise<void> | void;
   enabled?: boolean;
 }
 
@@ -21,15 +23,15 @@ interface UseSocketListenerOptions {
  * @example
  * const { socket } = useSocket();
  * useSocketListener(socket, {
- *   eventName: "newMessageSignal",
+ *   eventName: "conversation:updated",
  *   onEvent: async () => {
  *     await loadMessages();
  *   }
  * });
  */
-export const useSocketListener = (
+export const useSocketListener = <TArgs extends unknown[]>(
   socket: Socket | null,
-  options: UseSocketListenerOptions
+  options: UseSocketListenerOptions<TArgs>
 ) => {
   const { eventName, onEvent, enabled = true } = options;
 
@@ -38,7 +40,7 @@ export const useSocketListener = (
       return;
     }
 
-    const handleEvent = async (...args: any[]) => {
+    const handleEvent = async (...args: TArgs) => {
       console.log(`Socket event received: ${eventName}`);
       try {
         await onEvent(...args);
