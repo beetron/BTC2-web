@@ -84,7 +84,7 @@ npm run lint   # ESLint 10 with typescript-eslint and the React hooks rules (esl
 npm test       # Vitest unit tests (src/**/*.test.ts)
 ```
 
-The tests cover the logic that runs without a browser or API: message sync (applying edits and deletes, refreshing quotes), URL detection in messages, image upload validation and the retry id.
+The tests cover the logic that runs without a browser or API: message sync (applying edits and deletes, refreshing quotes), URL detection in messages, image upload validation, the retry id, and when an API error signs the user out.
 
 ### PR Review (CI)
 
@@ -186,6 +186,7 @@ src/
 - On login/signup, the API returns an **access token** (JWT, 7 days) and a **refresh token** (opaque, 14 days, sliding). Both are stored in `localStorage` alongside the user's cached profile fields (`nickname`, `uniqueId`, `email`, `userProfileImage`) — the tokens are the only things that actually need persisting; the profile fields are just an instant-paint hint.
 - **`AuthContext`** is the single source of truth for the current user's profile during a session. On mount it paints from the cached hint, then fetches `GET /users/me` in the background and corrects anything stale. Settings-page edits (nickname/uniqueId/email/profile image) go through context methods that update both the in-memory state and the cache — nothing else should read these fields from `localStorage` directly.
 - **Silent refresh**: `apiClient`'s response interceptor catches a `401`, calls `POST /auth/refresh` once, retries the original request with the new access token, and only falls back to logging the user out if the refresh itself fails. Concurrent `401`s share a single in-flight refresh instead of each firing their own request.
+- **Only a lost session signs the user out**: that unrecoverable `401` is the one response that logs out. Any other error, including `403` (signed in but not allowed) and `500` (server error), is shown as a normal error message and the user stays signed in, since signing in again would not change the answer.
 - **Multi-tab safe**: refresh tokens rotate on every use (one-time use), so two tabs racing a refresh at the same moment could otherwise cause the "losing" tab to wipe out the "winning" tab's freshly-issued tokens. If a refresh call fails, `apiClient` rechecks `localStorage` a moment later — if a sibling tab already rotated in a valid new token, it's used instead of logging out.
 - Logout sends the refresh token to `POST /auth/logout` so the server revokes it immediately, rather than just discarding it client-side.
 

@@ -138,7 +138,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         });
     }
 
-    // Subscribe to auth expiration events (401/403 responses)
+    // Subscribe to session-ended events (a 401 the token refresh could not
+    // fix, or a socket handshake rejected after a failed refresh)
     const unsubscribe = authEventEmitter.subscribe(() => {
       console.log("Authentication token expired, logging out...");
 
