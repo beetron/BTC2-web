@@ -60,11 +60,6 @@ export const EditFriendsPage: React.FC = () => {
     Record<string, string | null>
   >({});
 
-  useEffect(() => {
-    loadFriendRequests();
-    loadFriendList();
-  }, []);
-
   const loadFriendRequests = async () => {
     setLoadingRequests(true);
     try {
@@ -122,6 +117,12 @@ export const EditFriendsPage: React.FC = () => {
       setLoadingFriends(false);
     }
   };
+
+  // Declared after the load functions it calls
+  useEffect(() => {
+    loadFriendRequests();
+    loadFriendList();
+  }, []);
 
   const handleAcceptRequest = async (uniqueId: string) => {
     setProcessingId(uniqueId);

@@ -95,7 +95,7 @@ export const useProfileImageCache = (userIds: string[]) => {
               url,
               lastFetched: Date.now(),
             });
-          } catch (error) {
+          } catch {
             // Cache null for failed fetches to avoid retrying
             globalProfileImageCache.set(userId, {
               url: null,

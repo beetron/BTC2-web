@@ -45,7 +45,7 @@ A React chat application built with Vite and Mantine — direct messages, group 
 
 ### Prerequisites
 
-- Node.js 20.19+ or 22.12+ (required by Vite 7)
+- Node.js 22.12+ or 24 (Vitest 5 needs one of these; CI uses 24)
 - npm
 
 ### Installation
@@ -76,6 +76,28 @@ npm run build
 ```
 
 The built files will be in the `dist/` directory.
+
+### Lint and tests
+
+```bash
+npm run lint   # ESLint 10 with typescript-eslint and the React hooks rules (eslint.config.js)
+npm test       # Vitest unit tests (src/**/*.test.ts)
+```
+
+The tests cover the logic that runs without a browser or API: message sync (applying edits and deletes, refreshing quotes), URL detection in messages, image upload validation and the retry id.
+
+### PR Review (CI)
+
+`.github/workflows/pr-review.yml` runs on every PR into `main`, on pushes to `main` and by hand. Every job must pass:
+
+| Job | What it checks |
+|---|---|
+| Lint | `npm run lint` |
+| Typecheck and build | `npm run build` (`tsc -b`, then the Vite production build) |
+| Tests | `npm test` |
+| Dependency audit | `npm audit --audit-level=high` (moderate and low are reported, not blocking) |
+| CodeQL | GitHub's security analysis for JavaScript/TypeScript (`security-extended`) |
+| Semgrep | Community rules `p/javascript`, `p/typescript`, `p/react`, `p/secrets` |
 
 ## ⚙️ Environment Configuration
 

@@ -13,9 +13,14 @@ import {
   setSocketIdProvider,
 } from "./apiClient";
 
+// Socket.IO payloads are untyped JSON, so listeners declare their own
+// parameter types
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SocketCallback = (...args: any[]) => void;
+
 interface EventListener {
   event: string;
-  callback: (...args: any[]) => void;
+  callback: SocketCallback;
 }
 
 class SocketService {
@@ -139,7 +144,7 @@ class SocketService {
   /**
    * Add event listener and return unsubscribe function
    */
-  addListener(event: string, callback: (...args: any[]) => void): () => void {
+  addListener(event: string, callback: SocketCallback): () => void {
     // Store in listeners array
     this.listeners.push({ event, callback });
 
@@ -162,7 +167,7 @@ class SocketService {
   /**
    * Emit event to server
    */
-  emit(event: string, data?: any): void {
+  emit(event: string, data?: unknown): void {
     if (!this.socket) {
       console.warn("Socket not connected, cannot emit:", event);
       return;

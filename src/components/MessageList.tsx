@@ -11,6 +11,7 @@ import {
 } from "@mantine/core";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
+import { Socket } from "socket.io-client";
 import {
   useEffect,
   useState,
@@ -47,7 +48,7 @@ interface MessageListProps {
   conversationType: "direct" | "group";
   /** userId -> display info for every active member (including self) */
   memberMap: Record<string, MemberDisplay>;
-  socket: any;
+  socket: Socket | null;
   handleRef?: React.Ref<MessageListHandle>;
   onReply?: (msg: ConversationMessage) => void;
   onEdit?: (msg: ConversationMessage) => void;

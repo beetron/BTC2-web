@@ -47,7 +47,7 @@ export const validateImageFiles = (files: File[]): ValidationResult => {
       errors.push(
         `File ${index + 1} (${
           file.name
-        }): File size ${sizeMB}MB exceeds 30MB limit`
+        }): File size ${sizeMB}MB exceeds ${MAX_FILE_SIZE / (1024 * 1024)}MB limit`
       );
     }
   });

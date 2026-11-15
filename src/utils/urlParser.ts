@@ -30,8 +30,11 @@ export const parseUrlsInText = (text: string): TextPart[] => {
   }
 
   matches.forEach((match) => {
+    // A bare domain match ("example.com") starts with the whitespace before
+    // it; that whitespace stays in the text part, so skip past it
     const url = match[0].trim();
-    const startIndex = match.index!;
+    const leading = match[0].length - match[0].trimStart().length;
+    const startIndex = match.index! + leading;
 
     // Add text before URL
     if (startIndex > lastIndex) {
@@ -41,12 +44,7 @@ export const parseUrlsInText = (text: string): TextPart[] => {
       });
     }
 
-    // Add URL
-    let fullUrl = url;
-    if (!fullUrl.startsWith("http://") && !fullUrl.startsWith("https://")) {
-      fullUrl = "https://" + fullUrl;
-    }
-
+    // Add URL (getHrefFromUrl adds the scheme when it is rendered)
     parts.push({
       type: "url",
       content: url,
