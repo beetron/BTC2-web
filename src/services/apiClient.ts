@@ -148,7 +148,7 @@ class ApiClient {
       }
     );
 
-    // Add response interceptor to handle auth expiration and critical errors
+    // Add response interceptor to handle auth expiration
     this.api.interceptors.response.use(
       (response) => response,
       async (error) => {
@@ -175,18 +175,15 @@ class ApiClient {
           }
         }
 
-        // Handle authentication errors (401, 403) or critical server errors (500)
-        // 500 errors indicate something critical went wrong, likely auth-related
-        const isAuthError = status === 401 || status === 403;
-        const isCriticalError = status === 500;
-
-        if (isAuthError || isCriticalError) {
+        // Only a 401 the refresh above could not fix means the session is
+        // gone (expired, revoked or the account deleted), so only that logs
+        // the user out. Every other status, 403 (signed in but not allowed)
+        // and 500 (server error) included, is an ordinary error the caller
+        // shows; signing in again would not change the answer. A 401 from
+        // login or signup is a wrong password, not an ended session.
+        if (status === 401 && !isAuthFlowRequest) {
           console.log(
-            `[API Client] ${
-              isCriticalError
-                ? "Critical server error (500)"
-                : "Authentication error"
-            } detected, logging out user`
+            "[API Client] Session could not be refreshed, logging out user"
           );
 
           clearAuthStorage();
