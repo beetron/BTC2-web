@@ -142,6 +142,57 @@ describe("applyMessageChanges", () => {
 
     expect(messages[1].replyTo?.message).toHaveLength(200);
   });
+
+  it("gives a refreshed quote of a photo the first photo as its thumbnail", () => {
+    const reply = msg(3, {
+      replyTo: {
+        _id: "m2",
+        senderId: "bob",
+        message: "",
+        hasImages: true,
+        imageFile: "a.jpg",
+        imagesExpired: false,
+        deleted: false,
+        unavailable: false,
+      },
+    });
+    const { messages } = applyMessageChanges(
+      [msg(2), reply],
+      [msg(2, { message: "caption", imageFiles: ["a.jpg", "b.jpg"] })],
+    );
+
+    expect(messages[1].replyTo).toMatchObject({
+      message: "caption",
+      hasImages: true,
+      imageFile: "a.jpg",
+      imagesExpired: false,
+    });
+  });
+
+  it("drops the thumbnail when the quoted photos expire", () => {
+    const reply = msg(3, {
+      replyTo: {
+        _id: "m2",
+        senderId: "bob",
+        message: "",
+        hasImages: true,
+        imageFile: "a.jpg",
+        imagesExpired: false,
+        deleted: false,
+        unavailable: false,
+      },
+    });
+    const { messages } = applyMessageChanges(
+      [msg(2), reply],
+      [msg(2, { message: "", imageFiles: ["a.jpg"], imagesExpiredAt: at(40) })],
+    );
+
+    expect(messages[1].replyTo).toMatchObject({
+      hasImages: true,
+      imageFile: null,
+      imagesExpired: true,
+    });
+  });
 });
 
 describe("newestChangeTime", () => {

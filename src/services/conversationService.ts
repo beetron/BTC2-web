@@ -49,6 +49,14 @@ export interface ReplyPreview {
   senderId: string | null;
   message: string | null;
   hasImages: boolean;
+  /**
+   * First photo of the quoted message, for a thumbnail. null when it has no
+   * photos, is deleted, or its photos expired. Missing on replies cached
+   * before API 2.1.0.
+   */
+  imageFile?: string | null;
+  /** The quoted message's photos were removed by the API's image expiry job */
+  imagesExpired?: boolean;
   deleted: boolean;
   unavailable: boolean;
 }
@@ -61,6 +69,11 @@ export interface ConversationMessage {
   /** null once the message is deleted for everyone */
   message: string | null;
   imageFiles?: string[];
+  /**
+   * Set once the API's image expiry job removed the photos. imageFiles keeps
+   * the names (one placeholder each), but the files are gone.
+   */
+  imagesExpiredAt?: string | null;
   clientMessageId?: string | null;
   replyToId?: string | null;
   replyTo?: ReplyPreview;

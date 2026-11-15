@@ -31,14 +31,14 @@ describe("validateImageFiles", () => {
     expect(result.errors[0]).toContain("Invalid file type");
   });
 
-  it("rejects files over 49MB and names the real limit", () => {
-    const result = validateImageFiles([fakeFile("big.jpg", "image/jpeg", 50 * MB)]);
+  it("rejects files over 30MB and names the real limit", () => {
+    const result = validateImageFiles([fakeFile("big.jpg", "image/jpeg", 31 * MB)]);
     expect(result.isValid).toBe(false);
-    expect(result.errors[0]).toContain("exceeds 49MB limit");
+    expect(result.errors[0]).toContain("exceeds 30MB limit");
   });
 
-  it("allows a file of exactly 49MB", () => {
-    expect(validateImageFiles([fakeFile("max.jpg", "image/jpeg", 49 * MB)]).isValid).toBe(true);
+  it("allows a file of exactly 30MB", () => {
+    expect(validateImageFiles([fakeFile("max.jpg", "image/jpeg", 30 * MB)]).isValid).toBe(true);
   });
 
   it("rejects more than 10 files", () => {

@@ -14,6 +14,7 @@ interface CachedMessage {
   message: string | null;
   image?: string;
   imageFiles?: string[];
+  imagesExpiredAt?: string | null;
   clientMessageId?: string | null;
   replyToId?: string | null;
   replyTo?: {
@@ -21,6 +22,8 @@ interface CachedMessage {
     senderId: string | null;
     message: string | null;
     hasImages: boolean;
+    imageFile?: string | null;
+    imagesExpired?: boolean;
     deleted: boolean;
     unavailable: boolean;
   };

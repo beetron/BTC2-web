@@ -20,8 +20,8 @@ A React chat application built with Vite and Mantine — direct messages, group 
 - **Group chat**: create groups, rename, manage members (add/remove/leave), role-aware UI (owner/member)
 - **Add Friend from a group**: a non-friend group member can be sent a friend request right from the group settings modal
 - **Cursor-paginated messages**: older history loads as you scroll up, scroll position preserved
-- **Image messages**: attach and preview images in any conversation
-- **Message actions** (right-click a message): **Reply** with a quote of the original, **Copy text**, and for your own messages **Edit** (the message then shows its edit time with an "edited" label, and keeps its place in the thread) and **Delete for everyone** (leaves a "This message was deleted" placeholder; every image in that message is deleted too)
+- **Image messages**: attach and preview images in any conversation. Photos the API has expired (older than its `IMAGE_RETENTION_DAYS`, 30 by default) show a small "Photo expired" line instead and are never requested
+- **Message actions** (right-click a message): **Reply** with a quote of the original (a quoted photo shows as a small thumbnail, in the reply bar and in the quote), **Copy text**, and for your own messages **Edit** (the message then shows its edit time with an "edited" label, and keeps its place in the thread) and **Delete for everyone** (leaves a "This message was deleted" placeholder; every image in that message is deleted too)
 - **Link previews**: a small unfurl card (image/title/description) renders under any message containing a URL
 - **Friend management**: add, accept/reject requests, block/unblock, report
 - **Persistent sessions**: silent access-token refresh in the background — no forced re-login as long as the app is used at least once every 14 days
