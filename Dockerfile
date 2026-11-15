@@ -1,5 +1,5 @@
 # Multi-stage build for production
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 # Accept build argument for API URL
 ARG VITE_API_URL=http://localhost:3000
