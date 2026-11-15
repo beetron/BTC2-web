@@ -88,7 +88,7 @@ The tests cover the logic that runs without a browser or API: message sync (appl
 
 ### PR Review (CI)
 
-`.github/workflows/pr-review.yml` runs on every PR into `main`, on pushes to `main` and by hand. Every job must pass:
+`.github/workflows/pr-review.yml` runs on every PR into `main` or `development`, on pushes to `main` and by hand. The `PR-Review` ruleset on `main` requires every job to pass:
 
 | Job | What it checks |
 |---|---|
@@ -98,6 +98,10 @@ The tests cover the logic that runs without a browser or API: message sync (appl
 | Dependency audit | `npm audit --audit-level=high` (moderate and low are reported, not blocking) |
 | CodeQL | GitHub's security analysis for JavaScript/TypeScript (`security-extended`) |
 | Semgrep | Community rules `p/javascript`, `p/typescript`, `p/react`, `p/secrets` |
+
+### Dependabot
+
+`.github/dependabot.yml` checks every week for npm and GitHub Actions updates and opens PRs into `development` (minor and patch npm updates grouped into one PR, at most 5 open). PR Review runs on those PRs, so an update only goes in after its checks pass, and reaches `main` with the next release PR.
 
 ## ⚙️ Environment Configuration
 
